@@ -50,13 +50,10 @@ BUILD instructions
 
 2.  Setup proper links to the netCDF libs.  The fortran needs the include directory to use the netcdf module interface.
 
-3.  Edit the file "derived_types.f90".  At the top of the file is a character string identifying the location
-    of your system's "ncgen" command.  Insert the correct string.
-
-4.  Compile by typing "make"
+3.  Compile by typing "make"
     One executable is built:  "x.oban
 
-5.  After a successful compile, go into the "test_oban" directory and test the code, RTFF "README_TEST".
+4.  After a successful compile, go into the "test_oban" directory and test the code, RTFF "README_TEST".
 
 ================================================================================
 
