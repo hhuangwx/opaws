@@ -1,0 +1,430 @@
+------------------------------ LICENSE TERMS-------------------------------------------
+c
+c   Copyright (C) <2010>  <David C. Dowell and Louis J. Wicker, NOAA>
+c
+c   This library is free software; you can redistribute it and/or
+c   modify it under the terms of the GNU Lesser General Public
+c   License as published by the Free Software Foundation; either
+c   version 2.1 of the License, or (at your option) any later version.
+c
+c   This library is distributed in the hope that it will be useful,
+c   but WITHOUT ANY WARRANTY; without even the implied warranty of
+c   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+c   Lesser General Public License for more details.
+c
+------------------------------ LICENSE TERMS-------------------------------------------
+
+
+===> Observation Processing And Wind Synthesis (OPAWS) version 2.0
+===> based on NSSL_Oban2D version 2.3 and OPAWS version 1.6.1
+===> This version does 2D analysis on PPI surface.  Multipass Barnes and Cressman are implemented.
+
+Authors:
+Louis J. Wicker, NOAA National Severe Storms Laboratory
+David C. Dowell, NOAA Earth System Research Laboratory
+
+
+Contributors:
+Wen-Chau Lee (2001):  dorade sweep-file reader
+Mike Coniglio (2005, 2006):  velocity unfolding, ground-clutter removal, Mesonet-data input
+M. Majcen, P. Markowski, Y. Richardson, J. Wurman (2007):  multi-pass objective analysis
+Glen Romine (2010):  suggestion of ground-clutter mask
+Robin Tanamachi, Dan Dawson (2010):  bug fixes, filtering
+
+
+References:
+"Multipass Objective Analyses of Doppler Radar Data", Mon. Wea. Rev., October, 2008, pg 1845.
+
+
+Required software:
+
+1.  Fortran compiler (gfortran/Intel)
+2.  CC compiler (gcc is fine)
+3.  netCDF3/4 installation with fortran (3 vs 4 depends on which version used to write foray files)
+
+
+BUILD instructions
+------------------
+
+1.  Edit the Makefile to put in your fortran and C compilers.  Two examples are provided.
+
+2.  Setup proper links to the netCDF libs.  The fortran needs the include directory to use the netcdf module interface.
+
+3.  Edit the file "derived_types.f90".  At the top of the file is a character string identifying the location
+    of your system's "ncgen" command.  Insert the correct string.
+
+4.  Compile by typing "make"
+    One executable is built:  "x.oban
+
+5.  After a successful compile, go into the "test_oban" directory and test the code, RTFF "README_TEST".
+
+================================================================================
+
+changes for version 2.0 of OPAWS (10 December 2010 - 8 February 2011) - DCD
+---------------------------------------------------------------------------
+*  Merged NSSL_Oban2D (version 2.3) and OPAWS (version 1.6.1)
+   - oban.f90:  oban2f.f90 and oban2s.f90 have been combined (new executable "x.oban")
+                - *** NEW oban.input PARAMETER REQUIRED:  radar_data_format
+                - minrange condition for thresholding added to readforay, as in readsweep
+                - either min or max thresholding added to readforay, as in readsweep
+                - added sweep information (includes Nyquist velocity) to input and output
+                - modifed calculation of "time" array so that it is zero if the translation velocity is nonzero
+   - DART.f:  using newer OPAWS version
+              added qc value to output
+   - fileio.f:  renamed from fileio2.f (NSSL_Oban2D)
+                removed long section of commented-out code at the end
+                renamed WRITENETCDF2 to WRITENETCDF
+                changed formatted integer output to "I0" in WRITENETCDF
+                added height to output in WRITENETCDF
+                renamed DARTout2 to DART_radar_out, and incorporated updates from OPAWS 1.6.1
+                added clear-air reflectivity observation type to DART_radar_out
+                renamed WRITEV5D2 to WRITEV5D
+                changed bottomhgt from 0.0 to zmin in WRITEV5D
+                added subroutine write_beam_info
+                added which_vert value to parameter list in calls to write_DART_ob
+                added qc value to output
+                modified WRITENETCDF so that missing_value is written once, rather than twice, for each field
+   - oban.f90, fileio.f:  changed naming convention for output obs_seq file
+   - derived_types.f90:  added SWEEP_INFORMATION derived type
+                         added Nyquist_Velocity to FORAY_DATA
+   - moved to old_code subdirectory:  clutter_unfold.f
+   - renamed dow.inc to opaws.inc
+   - removed ncgen_module, with ncgen_command, from derived_types.f90 and moved ncgen_command to oban.f90
+                - *** NEW oban.input PARAMETER REQUIRED:  ncgen_command
+*  Changed oban input from sequential to namelist format (*** oban.nml replaces oban.input ***)
+*  Corrected bugs and unified procedure for determining radar location.  Now, if rlat, rlon, and ralt are specified
+   in oban.nml, then these values are used.  Otherwise, these parameters are determined from the radar data themselves.
+*  Corrected mismatch between mpass2d_oban parameter lists in oban.f90 and mpass_oban2d.f90.
+*  Initialized namelist parameters with default values in oban_namelist.f90.
+*  Added a subroutine verify_namelists that checks for the minimum information necessary for an objective analysis.
+*  Changed the names of some input parameters:  umass_flag to umass_data, extrapolate_flag to allow_extrapolation.
+*  Changed date and time corrections so that all specified parameters (year_cor, day_cor, sec_cor) are offsets.
+
+
+changes for version 2.3 of NSSL_Oban2D (22 November 2010) - LJW
+---------------------------------------------------------------
+
+*  Incorporated fixes by Robin Tanamachi and Dan Dawson.
+   These included dealing with sweep files that have 0 for one of the fields
+         on successive scans (e.g., DDC from Greensburg, 2007)
+   Added more sophsticated pre-oban and post-oban filters
+
+*  Added in ability in variable specification to output std. deviation from 
+   input oban deck (useful for DART)
+
+*  IMPORTANT: pre-v2.3 input files are NOT COMPATABLE!!!!!
+   Two changes:
+   Line 10+: Added the std. deviation value to read variable line at end
+  ~Line 22+: Added sec_offset value after day correction to be able to correct
+             time errors in sweeps (like the KOUN 8 May data set, off by 150 s)
+
+*  Added example Python script (pyOban.8may03_6min_2km.py) to process long list of 
+   input files which can be crafted to do more specific things with a generic input deck. 
+
+   type:  pyOban.8may03_6min_2km.py --help 
+
+   to see options.
+
+================================================================================
+
+changes for version 2.2 of NSSL_Oban2D (5 March 2010) - LJW
+-----------------------------------------------------------
+* Cleaned up the code, added some of the threhold filtering options.  Oban input files are NOT COMPATIABLE with other
+  versions, please look at the documentation from your old oban files for comparison.  They are close, but not the same.
+
+* Added benchmark directory called "test_oban".  See README_TEST file in that directory to test your build.
+  You can check to see if your build of the code works on your machine against my results.
+
+* Code was compiled and tested with Intel Fortran v11.1 running on MacPro and MacBook Pro using Snow Leopard 10.6.3
+
+* Code was compiled and tested with GNU gfortran/gcc v4.3 running on MacPro and MacBook Pro using Snow Leopard 10.6.3
+
+changes for version 2.1  of NSSL_Oban2D(3 March 2010) - LJW
+-----------------------------------------------------------
+
+oban2s:  "SWEEP" reader version of the software
+oban2f:  "FORAY" reader version of the software
+
+changes for version 2.0  of NSSL_Oban2D(5 Feb 2010) - LJW
+----------------------------------------------------------------------------------------------
+
+* new version that can only do 2D analysis on PPI surface.  Multipass Cressman and Barnes are
+possible, though MP Cressman is a kludge and not recommended.  Back interpolation to observation
+point is via bi-linear interpolation.
+
+* IMPORTANT:  input file is NOT backward compatible - please use input file in this directory
+              Mostly, things have been removed that are not necessary or supported.
+
+* IMPORTANT:  code still uses netCDF utility NCGEN to construct the netCDF file.  Please EDIT the top of the
+              file "derived_types.f90" to reflect the location of your ncgen command.
+
+* Code was rewritten to support new data structures for both radar observations and analysis grids.
+
+* Three output files are currently generated automatically:  'prefix'.v5d, 'prefix'.out (DART file), 'prefix'.nc
+
+* netCDF files can be plotted using the PlotOban.py software.
+
+* Currently, only "solo-dorade" sweep files can be inputted, however, new data structure greatly faciliates
+  the implementation of other formats.  WDSS-II and Foray netcdf formats input files will be implemented soon.
+
+* Re-implementation of 3D analysis schemes are planned, and would require small changes.
+
+* Some changes in the Makefile
+
+* Most of the new routines I have written, if they existed in the original versions, now are called "2", such as fileio2, etc.
+
+  Lou Wicker, 5 Febuary 2010.
+
+
+changes for version 1.6.1 of OPAWS (2-10 March 2010, 1 September 2010, 10 November 2010)
+--------------------------------------------
+* Modified oban so that it accepts the name of the input parameter file on the command line.
+* Changed algorithm for detecting "duplicate" reflectivity sweeps for super-res 88D data in ppi_oban in util.f.
+* Added a new program ppi_stats.
+* Added new parameter max_el_angle_diff to dow.inc.
+* Added read and write routines for netcdf "ppi stats" files in fileio.f.
+* Changed input to oban to include many ground-clutter parameters.
+* Changed arguments to ppi_oban in util.f.
+* Changed arguments to find_clutter and remove_clutter in find_clutter.f.
+* Removed one argument from write_DART_header in DART.f.
+* Modified DART.f and fileio.f so that only relevant DART variable types are listed.
+* Added a subroutine clutter_mask to util.f.
+* Added inputs for clutter masking (based on ppi stats) to oban.f.
+* Added height_max thresholding to oban.f, requiring one additional parameter as input to oban.
+* Changed maxflds to 20 in dow.inc.
+* Modified read_dorade.c so that it checks for exact parameter name match.
+* Added an option IFLPORT which affects whether the "use iflport" command (needed for Intel Fortran compiler)
+  is invoked in the folowing files:  oban.f, fileio.f.
+* Changed order of arguments in "oban" linking in Makefile.
+* Replaced instances of 'I' with 'I0' and 'F' with 'ES14.7' in formatted output in fileio.f.
+
+
+changes for version 1.5.12 of OPAWS (2 October 2009, 15 January 2010, 3 February 2010)
+--------------------------------------------
+* Added height (km AGL) to netcdf output from oban if output_format is 2 (ppi).
+* Modified read_dorade.c and read_dorade.h to allow for multiple lengths of RADD and PARM blocks.
+* Modified sweepread in read_dorade.c so that it returns data of size 0 (rather than terminating)
+  if a field is not found.
+* Added a new subroutine read_csfd to read_dorade.c and read_dorade.h that initializes the same
+  data as read_celv.
+* Added offset_fac to input and to calculations in read_sh_arr in read_dorade.c.
+* Added code to ppi_oban in util.f that deletes the current sweep of reflectivity data
+  if the field name is 'REF' (e.g., super-res 88D data) and if the elevation angle is
+  a duplicate of the previous sweep of 88D data.
+* Moved code for matching azimuth angles from different scans in ground-clutter removal
+  from find_clutter in find_clutter.f to ppi_oban in util.f.
+
+
+changes for version 1.5.11 of OPAWS (8-26 November 2007, 25 February 2008, 2 May 2008, 23 September 2008)
+--------------------------------------------
+* Added new parameters min_threshold and max_threshold for each objectively
+  analyzed field (oban.f, util.f, oban.input).
+* Removed f1_threshold from input parameters (oban.f) and call to ppi_oban (oban.f and util.f).
+* Changed thresholding based on field #1 to use values specified by min_threshold(1) and max_threshold(1)
+  (ppi_oban in util.f).
+* Corrected count of number of valid observations (ppi_oban in util.f).
+* Modified logic for determining which reflectivity observations are clear air
+  observations (fileio.f).
+* Added input of a "bad obs" list to DART_sfc_obs.f (requires a new line in the input files).
+* Added capability of reading data from http://data.nssl.noaa.gov in DART_sfc_obs.f.
+* Added D1 and V1 to known fields for reflectivity and velocity, respectively.
+* Modified ppi_oban in util.f so that if time-to-space conversion is used, the times (days and secs)
+  are changed to the reference ("central") time.
+
+
+changes for version 1.5.10 of OPAWS (2 August - 12 September 2007)
+---------------------------------------------------
+* Added -heap-arrays to OPT in Makefile for Intel 10.0 compiler on Mac.
+* Added code to DART_radar_out in fileio.f that alternates the index ordering
+  from one sweep to the next when thinning clear air reflectivity obs.
+* Added capability of reading StickNet data to DART_sfc_obs.f.
+
+
+changes for version 1.5.9 of OPAWS (27 March - 25 July 2007)
+---------------------------------------------------
+* Created a new DART observation type in DART.f:  RADAR_CLEARAIR_REFLECTIVITY.
+* To DART_radar_out subroutine in fileio.f, added optional code that outputs a reflectivity observation
+  as one of two types:  RADAR_REFLECTIVITY or RADAR_CLEARAIR_REFLECTIVITY.  The default
+  is the former type.  The latter type applies when data-void filling is used and the
+  objectively analyzed value is the same as the fill_value.
+* Added input of new parameters in oban.f, to control how clear air reflectivity is handled.
+  (Note:  oban.input files must be updated to include these new parameters.)
+* Added -m64 to OPT and CFLAGS in Makefile (seems to be necessary for gcc to work together with Intel
+  Fortran compiler 10.0).
+* Removed -Wl,-stack_size from OPT in Makefile (also seems to be necessary to build programs with
+  Intel compiler 10.0).
+* Corrected function timediff in util.f, so that the deltat calculation does not begin with an
+  unitialized value.
+
+
+changes for version 1.5.8 of OPAWS (13 March 2007)
+--------------------------------------------
+* Removed the program "snakeplot.f" from the code distribution.
+* Added write_beam_info subroutine to fileio.f.
+* Added code to oban to collect beam information and write beam_info.nc.
+* Created new script snakeplot.ncl to plot beam information.
+
+
+changes for version 1.5.7 of OPAWS (1-10 March 2007)
+--------------------------------------------
+* Modified retrievepb.f and Makefile to compile retrievepb for NCL output
+  rather than NCAR Graphics.
+* Changed name of subroutine sdin_netcdf to readnetcdf in fileio.f.
+* Added section in retrievepb.f that sets F, G, and H to zero where data
+  are created by hole filling.
+* Added option of outputting temperature or potential temperature in DART_sfc_obs.f.
+* Added new obs_kind (THETA_2m) and obs_name (METAR_POT_TEMP_2_METER) to DART.f.
+* Added flag t_or_td passed to DART_sfc_out in fileio.f.
+
+
+changes for version 1.5.6 of OPAWS (13-14 February 2007)
+--------------------------------------------
+* Modified DART_sfc_obs.f to handle any order of fields in GEMPAK file.
+* Corrected error in observation count in DART_sfc_obs.f.
+
+
+changes for version 1.5.5 of OPAWS (16 December 2006-19 January 2007)
+------------------------------------------------------------
+* Added a new input data format -- text file produced by GEMPAK -- to DART_sfc_obs.
+* Added vertical coordinate type as input to DART_sfc_obs.
+* Added build options for Mac OSX 10.4.8 (Intel) to Makefile.
+* Commented out zdr and kdp output in write_DART_header.
+* Replaced int(KN+0.5) and int(KN-0.5) with nint(KN) in ppi_oban in util.f
+
+
+changes for version 1.5.4 of OPAWS (14 September 2006)
+---------------------------------------------
+* Increased number of input flags to oban for removing ground clutter:
+  (1) reflectivity threshold, (2) echo top, (3) spin change, (4) vertical gradient.
+* Moved vertical gradient test outside spin change test in find_clutter.f
+  (remove_clutter subroutine).
+* Cleaned up vertical gradient test so that it is only applied when both upper
+  and lower reflectivity values are valid.
+* Changed vertical gradient test so that removal occurs only when vertical
+  reflectivity gradient is negative.
+
+
+changes for version 1.5.3 of OPAWS (19 June 2006)
+--------------------------------------------
+* Added Macintosh build option to Makefile.
+* Added "sequence" statement to derived type definitions in structures.inc,
+  so that xlf compiler on Mac doesn't complain.
+* Added code to DART_sfc_obs.f to reject bad Mesonet data.
+
+
+changes for version 1.5.2 of OPAWS (14 June 2006)
+--------------------------------------------
+* Added code from Mike Coniglio for reading Oklahoma Mesonet
+  data in DART_sfc_obs.
+* Expanded sfc_sites.txt file to include Mesonet stations.
+
+
+changes for version 1.5.1 of OPAWS (8 June 2006)
+--------------------------------------------
+* Added find_clutter.o to OBJS2 in Makefile.
+* Modified xderiv, yderiv, and zderiv in util.f to catch case
+  when number of gridpoints = 1.
+
+
+changes for version 1.5 of OPAWS (2 March-3 June 2006)
+--------------------------------------------
+* Added compiler option -DLONG32 for compiling software that uses subroutines
+  in read_dorade.c to read sweep files.  This option, which is needed for
+  reading sweep files on a 64-bit system that were created on a 32-bit system,
+  forces the "long" (64-bit integer on 64-bit systems, 32-bit integer on 32-bit
+  systems) C data type to be read as "int" (32-bit integer) C data type instead.
+  Creating the -DLONG32 option required changes to the following source code:
+  Makefile, read_dorade.h, read_dorade.c.
+* Added Mike Conglio's subroutine for ground-clutter removal:
+  - added Mike's "find_clutter.f" code to Makefile
+  - added Mike's code for calling find_clutter to ppi_oban in util.f
+  - added "remove_clutter" flag to oban.f and call to ppi_oban
+  This change requires an extra line in "oban.input" files.
+* Added "DART.f" module (from PyENCOMMAS) to code distribution and removed
+  redundant code in "fileio.f".
+* Changed DART output ("write_DART_ob" subroutine in "fileio.f") so that
+  longitudes are always positive.
+* Changed name of DARTout to DART_radar_out in "fileio.f".
+* Added new subroutine DART_sfc_out to "fileio.f".
+* Created new program DART_sfc_obs, for creating DART format surface ob. files.
+* Added option for reading all sweep files with a given path name in "oban"
+  (activated with nswp=-1).
+
+
+changes for version 1.4 of OPAWS (11 February 2006)
+------------------------------------------
+* Added units to netcdf output for 3D fields.
+* Added functonality to scalar_vec.ncl.
+
+
+changes for version 1.3.1 of OPAWS (10 February 2006)
+--------------------------------------------
+* In "vorticity" subroutine of util.f, changed derivative computations
+  to allow uncentered finite differences if centered finite differences
+  aren't possible.
+* Added a new program "az_point_target" for retrieving azimuth-angle-offsets
+  from point-target coordinates relative to two radars.
+* Added functionality to scalar_vec.ncl.
+
+
+changes for version 1.3 of OPAWS (30 January 2006)
+-----------------------------------------
+Made several changes to "oban" program:
+* added capability of replacing missing-data values at individual gates
+  with a user-specified value.  (The "oban.input" format was modified slightly.)
+* added more flexibility for correcting times.  (The "oban.input" format was
+  modified slightly.)
+* changed "timediff" computation to be based on each beam's julian day
+  rather than the volume's year, month, and day
+* added differential reflectivity and specific differential phase shift
+  to DART output
+
+
+changes for version 1.2 of OPAWS (18 December 2005)
+------------------------------------------
+* Updated DARTout and write_DART_ob subroutines in fileio.f for new DART observation file format
+
+* Added option of local velocity unfolding (Miller et al 1986) to oban program.  This new option
+  requires a new field in any input parameter file used to run oban.  The new field (unfold_flag)
+  appears on each line where a field to be interpolated is specified.  Note that local unfolding
+  is performed only if the output data are PPI rather than Cartesian.
+
+* Added Nyquist_vel as a field in DART format observation files produced by oban.
+
+
+changes for version 1.1 of OPAWS (9 October 2005)
+-------------------------------------------------
+* corrected error with reading of zmin in sdin_netcdf subroutine of fileio.f
+
+
+Recent changes to code (as of 4 August 2005) for version 1.0 of OPAWS
+---------------------------------------------------------------------
+* netcdf output from oban, netcdf input to dualdop, and netcdf output from dualdop have been
+  added; the format includes all variables/fields in the netcdf format produced by CEDRIC, plus
+  a few more variables
+
+* an example script scalar_vec.ncl is provided for plotting netcdf files
+
+* a new program "snakeplot" has been created; previously, this functionality was in "oban";
+  snakeplot reads files in the "oban.input" format; snakeplot requires NCAR Graphics
+
+* the Makefile has been updated, since oban and dualdop no longer require NCAR Graphics
+
+* oban and azdd no longer input azcor1 and azcor2 separately for each sweep; now, these factors
+  are assumed to be the same for all sweeps; changes to earlier versions of "oban.input" files
+  will be needed as a result of these changes
+
+* oban and dualdop now input fewer parameters; changes to earlier versions of "oban.input"
+  and "dualdop.input" files will be needed as a result of these changes
+
+* writev5d (called from oban and dualdop) is now configured to automatically write out all/most
+  known fields
+
+* an error in zderivc (in util.f) has been corrected
+
+* structures.h has been renamed to structures.inc
+
+* more fields (specifically, tilting and stretching) have been added to the output from dualdop
+
+* sdout (in fileio.f), which outputs text data from oban, has been changed to output all significant
+  digits for floating point numbers
