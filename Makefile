@@ -25,20 +25,11 @@ NETCDFLIB = -L/   /   /netcdfs34/lib -lnetcdf
 # 
 # Generic gfortran is left to default.
 
-#=====>> Gfortran on a Mac OSX 10.6.x
+#=====>> Gfortran 
 # 
 FC   = gfortran -m64 -g -O0 -Wl,-stack_size,10000000 -ffixed-line-length-132 -Wunused -Wuninitialized
 CC   = gcc
 CFLAGS = -m64 -c -g -I. -DLONG32 -DUNDERSCORE -DLITTLE -Wunused -Wuninitialized
-#CFLAGS = -m64 -c -g -I. -DLONG32 -DUNDERSCORE -DLITTLE -I/Developer/SDKs/MacOSX10.6.sdk/usr/include -I/Developer/SDKs/MacOSX10.6.sdk/usr/include/malloc -Wunused -Wuninitialized
-
-
-#=====>> x86 32 bit Intel IFORT on Mac OSX 10.6.x
-# 
-#FC   = ifort -m32 -extend_source
-#CC   = gcc
-#CFLAGS = -m32 -c -g -I. -DLONG32 -DUNDERSCORE -DLITTLE
-
 
 #=====================================================================================================
 # Leave this stuff alone

@@ -35,7 +35,6 @@ Robin Tanamachi, Dan Dawson (2010):  bug fixes, filtering
 References:
 "Multipass Objective Analyses of Doppler Radar Data", Mon. Wea. Rev., October, 2008, pg 1845.
 
-
 Required software:
 
 1.  Fortran compiler (gfortran/Intel)
@@ -52,8 +51,6 @@ BUILD instructions
 
 3.  Compile by typing "make"
     One executable is built:  "x.oban
-
-4.  After a successful compile, go into the "test_oban" directory and test the code, RTFF "README_TEST".
 
 ================================================================================
 
