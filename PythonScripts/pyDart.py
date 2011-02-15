@@ -719,12 +719,14 @@ class pyDART():
         max_num_obs = long(stuff[3])
         
         data_storage = []
+
         for numcp in N.arange(num_copies):
             data_storage.append(fi.readline())  # Read(str) how the data is written....e.g., "observations" or "truth"
-            print data_storage
             
+        for numqc in N.arange(num_qc):          # If the num_qc flag is > 0, read the description of the qc flags
+            qc_descrip = fi.readline()
+
         stuff       = fi.readline()         # Read(str) "first   1   last   No of obs" line
-        
         stuff       = stuff.split()
         first       = long(stuff[1])
         last        = long(stuff[3])
@@ -735,6 +737,7 @@ class pyDART():
         row['origin_file'] = "Original DART observation file is: " + self.ascii + "\n"
         row['num_copies']  = num_copies
         row['num_qc']      = num_qc
+        row['qc_descrip']  = qc_descrip.strip()  # Get rid of blank spaces
         row['num_obs']     = num_obs
         row['max_num_obs'] = max_num_obs
         row['first']       = first
@@ -748,6 +751,7 @@ class pyDART():
             print "Number of QC'd observations:   ", num_qc
             print "Number of observations:        ", num_obs
             print "Max number of observations:    ", max_num_obs
+
 
 # Find the obs group to create table in
         
@@ -782,6 +786,9 @@ class pyDART():
                     print data_storage
                     sys.exit(-1)
             
+            for numqc in N.arange(num_qc):      # If the num_qc flag is > 0, read the quality control flag
+                row["qc"]     = read_double_precision_string(fi.readline())
+
             stuff            = fi.readline()
             stuff            = stuff.split()
             row["previous"]  = long(stuff[0])
@@ -1144,7 +1151,7 @@ class pyDART():
         attr = h5file.root.header.attributes
         nobs = attr.col('num_obs')[0]
 
-        fi.write("  num_copies:            %d  num_qc:            %d\n" % (attr.col('num_copies')[0], 0 ))
+        fi.write("  num_copies:            %d  num_qc:            %d\n" % (attr.col('num_copies')[0], attr.col('num_qc')[0] ))
         
         if self.index != None:
             fi.write(" num_obs:       %d  max_num_obs:       %d\n" % (len(self.index), len(self.index)) )
@@ -1165,8 +1172,12 @@ class pyDART():
                 fi.write("truth\n")
                 
             fi.write("  first:            %d  last:       %d\n" % (attr.col('first')[0], attr.col('last')[0]))
+
             if self.debug:
                 print "pyDart/hdf2ascii:  Max number of observations:    ", attr.col('max_num_obs')[0]
+
+            if attr.col('num_qc')[0] == 1:
+                fi.write(str(attr.col('qc_descrip')[0]).strip() + "\n")
         
         if self.debug:
             print "pyDart/hdf2ascii:  Number of observation copies:  ", attr.col('num_copies')[0]
@@ -1188,6 +1199,9 @@ class pyDART():
             
             if attr.col('num_copies')[0] == 2:
                 fi.write("   %20.14f\n" % row["truth"]  )
+            
+            if attr.col('num_qc')[0] == 1:
+                fi.write("   %20.14f\n" % row["qc"]  )
             
 # Code (from RLT) to output correct index number for each ob in the output DART file
             if n == 1: 
@@ -1350,6 +1364,7 @@ class DART_header(IsDescription):
         origin_file         = StringCol(255)
         num_copies          = Int64Col(dflt=long(missing))
         num_qc              = Int64Col(dflt=long(missing))
+        qc_descrip          = StringCol(80,dflt="")
         num_obs             = Int64Col(dflt=long(missing))
         max_num_obs         = Int64Col(dflt=long(missing))
         first               = Int64Col(dflt=long(missing))
@@ -1359,6 +1374,7 @@ class DART_obs(IsDescription):
         number              = Float64Col(dflt=missing)
         value               = Float64Col(dflt=missing)
         truth               = Float64Col(dflt=missing)
+        qc                  = Float64Col(dflt=missing)
         previous            = Float64Col(dflt=missing)
         next                = Float64Col(dflt=missing)
         cov_group           = Float64Col(dflt=missing)

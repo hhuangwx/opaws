@@ -167,11 +167,10 @@ files = [  \
 ]
 
 #
-# Run the model 
+# Run the analysis
 #
-
 #-------------------------------------------------------------------------------
-# Main program for testing...
+# Main program 
 # 
 if __name__ == "__main__":
 
@@ -185,11 +184,6 @@ if __name__ == "__main__":
     parser.add_option("-c",  "--convert",dest="convert", help="Run pyDart and convert the ascii files to HDF5 PyTables", action="store_true")
     parser.add_option("-m",  "--merge",  dest="merge",   help="Merge the individual pyDART hdf5 files into a single file", action="store_true")
     (options, args) = parser.parse_args()
-
-    if not options.run or options.convert or options.merge:
-        print "To get help, type 'pyOban_example_script.py -h'\n"
-        print "To get help, type 'pyOban_example_script.py -h'\n"
-        sys.exit(1)
 
     filenames = []   # Create list variable to store filenames for table merge
 
@@ -229,15 +223,17 @@ if __name__ == "__main__":
 
         if options.convert:
             print "Running pyDart conversion"
-            cmd = "./pyDart.py" + (" -f %s.out --ascii2hdf" % filename) + (" >> %s.output" % filename)
+            cmd = "./pyDart.py" + (" -f obs_seq_%s.out --ascii2hdf" % filename) + (" >> %s.output" % filename)
             print "Running cmd:  %s" % cmd
             os.system(cmd)
         
-        filenames.append("%s.h5" % filename)
+        filenames.append("obs_seq_%s.h5" % filename)
 
     print "\n<<<<<===========================================================================================>>>>>>\n"
 
     if options.merge:
+        if filenames == []:
+            filenames = glob.glob(out_prefix + "*.h5")
         mergefile = filenames[0][:-9] + ".h5"
         print "Running pyDart merge, combined file:  %s" % mergefile
         pyDart.mergeTables(mergefile, filenames)
