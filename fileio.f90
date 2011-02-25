@@ -542,6 +542,7 @@
       if ( index(anal%name(i),'VEL') .ne. 0) vr_index=i
       if ( index(anal%name(i),'VR') .ne. 0) vr_index=i
       if ( index(anal%name(i),'VT') .ne. 0) vr_index=i
+      if ( index(anal%name(i),'DV') .ne. 0) vr_index=i
 
       if ( index(anal%name(i),'DR') .ne. 0) zdr_index=i
 
