@@ -17,7 +17,8 @@ c
 
 ===> Observation Processing And Wind Synthesis (OPAWS) version 2.0
 ===> based on NSSL_Oban2D version 2.3 and OPAWS version 1.6.1
-===> This version does 2D analysis on PPI surface.  Multipass Barnes and Cressman are implemented.
+===> This version does 2D analysis on PPI surface or 3D analysis on a cartesian grid.
+===> Multipass Barnes and Cressman analysis schemes are available.
 
 Authors:
 Louis J. Wicker, NOAA National Severe Storms Laboratory
@@ -30,6 +31,7 @@ Mike Coniglio (2005, 2006):  velocity unfolding, ground-clutter removal, Mesonet
 M. Majcen, P. Markowski, Y. Richardson, J. Wurman (2007):  multi-pass objective analysis
 Glen Romine (2010):  suggestion of ground-clutter mask
 Robin Tanamachi, Dan Dawson (2010):  bug fixes, filtering
+Corey Potvin (2011) rewrote the I/O netCDF routines to eliminate the use of "ncgen" in the code.
 
 
 References:
@@ -45,22 +47,24 @@ Required software:
 BUILD instructions
 ------------------
 
-1.  Edit the Makefile to put in your fortran and C compilers.  Two examples are provided.
+1.  COPY Makefile.default to Makefile for your local config.
 
-2.  Setup proper links to the netCDF libs.  The fortran needs the include directory to use the netcdf module interface.
+2.  Edit the Makefile to put in your fortran and C compilers.  Two examples are provided.
 
-3.  Compile by typing "make"
-    One executable is built:  "x.oban
+3.  Setup proper links to the netCDF libs.  The fortran needs the include directory to use the netcdf module interface.
+
+4.  Compile by typing "make".  One executable is built:  "x.oban
 
 ================================================================================
 
-changes for version 2.0 of OPAWS (5 March 2011) - LJW
+changes for version 2.0_beta2 of OPAWS (4 March 2011) - LJW
 ---------------------------------------------------------------------------
 * Fixed bugs in FORAY processing when no good data is present
 * Tried to elimiate any memory leaks in code
 * Removed ncgen calls from code - all netcdf files written now with pure fortran
+* Moved Makefile to Makefile.default to help make sure local Makefile dont get overwritten.
 
-changes for version 2.0 of OPAWS (10 December 2010 - 8 February 2011) - DCD
+changes for version 2.0_beta1 of OPAWS (10 December 2010 - 8 February 2011) - DCD
 ---------------------------------------------------------------------------
 *  Merged NSSL_Oban2D (version 2.3) and OPAWS (version 1.6.1)
    - oban.f90:  oban2f.f90 and oban2s.f90 have been combined (new executable "x.oban")
