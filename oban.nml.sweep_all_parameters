@@ -109,10 +109,8 @@
                                       !
    nswp = 14                          ! controls file I/O:  nswp = -1 ==> read all files in directory at bottom of input file
                                       !                     nswp >  0 ==> read nswp # of filenames at bottom of input file
-   ncgen_command = 'ncgen',           ! path/executable for local "ncgen" command
 /
 &fields
-   fieldnames  = 'DZ', 'VU',          ! Names of the fields to be read from the dorade/netcdf radar-data files
    fill_flag   =    1,    0,          ! fill missing field values with a specified value? (0=no, 1=yes)
    fill_value  =  0.0,  0.0,          ! replacement value, if fill_flag==1
                                       !
@@ -133,6 +131,8 @@
                                       ! Example:
                                       !         Threshold Vr on dBZ:  post_oban_filter_flag = -1, Vr=missing for dBZ > 70.
                                       !
+   fieldnames  = 'DZ', 'VU',          ! Names of the fields to be read from the dorade/netcdf radar-data files
+                                      ! For some reason, gfortran needs the character reads to be last, or it quits.
 /
 ======= DO NOT EDIT THIS LINE -> MUST START WITH 6 "=" for the oban formatted I/O to find the start of input files
 ./koun_sweep/swp.1030508220458.OSF_RVP7.0.0.5_PPI_v1
