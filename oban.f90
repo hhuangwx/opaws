@@ -89,7 +89,7 @@ PROGRAM OBAN
 
   include 'v5df.h'
 
-  character(LEN=128), parameter :: version = "Version 2.0 beta:  Updated January 28, 2011 [DCD]"
+  character(LEN=128), parameter :: version = "Version 2.0 beta2:  Updated 05 March, 2011 [LJW]"
 
   integer i, j, k, ns, np, nf                ! loop variables
   integer ls                                 ! length of input string
