@@ -60,6 +60,7 @@ CONTAINS
 ! Passed variables
 
     integer nfld                    ! number of data fields to be gridded
+    integer i, j, k
     TYPE(ANALYSISGRID) anal
     logical allow_extrapolation     ! should extrapolation be allowed?
                                     !   .true. for standard objective analysis, .false. for interpolation only
@@ -87,13 +88,19 @@ CONTAINS
     IF ( .not. allocated(time) ) allocate(time(nx,ny,nz))
 
     IF ( .not. allow_extrapolation ) sumdir(:,:,:,:,:)   = 0.0
-    f(:,:,:,:)      = 0.0
-    sumf(:,:,:,:)   = 0.0
-    azcomp(:,:,:,:) = 0.0
-    count(:,:,:,:)  = 0
-    el(:,:,:)       = 0.0
-    height(:,:,:)   = 0.0
-    time(:,:,:)     = 0.0
+    DO i = 1,nx
+    DO j = 1,ny
+    DO k = 1,nz
+      f(i,j,k,1:nfld)      = 0.0
+      sumf(i,j,k,0:nfld)   = 0.0
+      azcomp(i,j,k,1:2)    = 0.0
+      count(i,j,k,1:nfld)  = 0
+      el(i,j,k)            = 0.0
+      height(i,j,k)        = 0.0
+      time(i,j,k)          = 0.0
+   ENDDO
+   ENDDO
+   ENDDO
 
   RETURN
   END SUBROUTINE OBAN_INIT
@@ -253,9 +260,6 @@ CONTAINS
     real vr_bin_size                ! size of velocity bins, for computing mode
     parameter(vr_bin_size=2.0)
 
-
-
-
     write(6,*) 'PROCESS_SWEEP->PASS #, SWEEP #: ',pass, ' ', s
 
     IF (pass.eq.1) THEN
@@ -397,8 +401,6 @@ CONTAINS
 
       IF( .not. allocated(vol%sweep%field(n)%ob)) THEN
         write(6,*) 'Sweep has no good gates! Skipping this sweep!'
-!        DCD 1/28/11  the following command is no longer needed
-!        anal%f(:,:,s,n,pass) = sbad
         CYCLE  
       END IF
 
@@ -438,6 +440,7 @@ CONTAINS
         bin_count(:,:,:) = 0
 
 ! Note:  k index is not needed for loops below because analysis_type is 2 (2D sweep-by-sweep).
+
         DO o = 1,vol%sweep%field(n)%number_of_valid_obs
           IF (vol%sweep%field(n)%ob(o)%range .ge. minrange .and.    &
               vol%sweep%field(n)%ob(o)%value .ne. sbad) THEN
@@ -499,7 +502,7 @@ CONTAINS
 !############################################################################
 
       DO o = 1,vol%sweep%field(n)%number_of_valid_obs
-          
+
         IF (vol%sweep%field(n)%ob(o)%range .ge. minrange .and.    &
             vol%sweep%field(n)%ob(o)%value .ne. sbad) THEN
 
@@ -570,7 +573,6 @@ CONTAINS
 
                   IF( pass .eq. 1 ) THEN
                     sumf(i,j,k,0)   = sumf(i,j,k,0)   + wgt
-! DCD 1/26/11 bug fix:  vol%zoffset was previously not included in calculation of z
                     height(i,j,k)   = height(i,j,k)   + wgt * z
                     time(i,j,k)     = time(i,j,k)     + wgt * vol%sweep%field(n)%ob(o)%time
                     el(i,j,k)       = el(i,j,k)       + wgt * vol%sweep%field(n)%ob(o)%el
@@ -715,6 +717,7 @@ CONTAINS
 ! time, azimuths and elevations for the DART file....
 
 ! DCD 1/26/11:  changed .gt. to .ge., for consistency with previous use of minsum
+
           IF( pass .eq. 1 .and. sumf(i,j,k,0) .ge. minsum ) THEN
           
             azcomp(i,j,k,1)    = azcomp(i,j,k,1) / sumf(i,j,k,0)

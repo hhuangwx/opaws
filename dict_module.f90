@@ -9,6 +9,7 @@ MODULE DICTIONARY
           ! publically accessible 
 
   integer, parameter, private :: value_length = 80
+  character(len=1), dimension(1) :: char4transfer 
 
   type KEY_VALUE 
     character(len=40)             :: key 
@@ -91,6 +92,7 @@ MODULE DICTIONARY
     deallocate(dict_data%old)                                 ! Deallocate old list
 
    ENDIF
+
 
    dict_data%list(n+1)%key   = key_value
 
@@ -204,7 +206,7 @@ MODULE DICTIONARY
      IF( dict_data%list(n)%type(1:3) .eq. 'str' ) THEN
       str = ""
       str = DICT_GET( dict_data%list(n)%key, str )
-      write(6,FMT='(a40," -->",1x,a)')  trim(dict_data%list(n)%key), trim(str)
+      write(6,FMT='(a40," -->",1x,a10)')  trim(dict_data%list(n)%key), trim(str)
      ENDIF
 
      IF( dict_data%list(n)%type(1:3) .eq. 'flt' ) THEN
@@ -250,7 +252,7 @@ MODULE DICTIONARY
        IF( allocated(dict_data%list(n)%value) ) THEN
          deallocate(dict_data%list(n)%value)
        ENDIF
-       lengthData = size(transfer(value, dict_data%list(n)%value))
+       lengthData = size(transfer(value, char4transfer))
        allocate(dict_data%list(n)%value(lengthData))
        dict_data%list(n)%value = transfer(value, dict_data%list(n)%value)
        dict_data%list(n)%type  = 'int'
@@ -285,7 +287,7 @@ MODULE DICTIONARY
        IF( allocated(dict_data%list(n)%value) ) THEN
          deallocate(dict_data%list(n)%value)
        ENDIF
-       lengthData = size(transfer(value, dict_data%list(n)%value))
+       lengthData = size(transfer(value, char4transfer))
        allocate(dict_data%list(n)%value(lengthData))
        dict_data%list(n)%value = transfer(value, dict_data%list(n)%value)
        dict_data%list(n)%type  = 'flt'
@@ -354,7 +356,7 @@ MODULE DICTIONARY
        IF( allocated(dict_data%list(n)%value) ) THEN
          deallocate(dict_data%list(n)%value)
        ENDIF
-       lengthData = size(transfer(value, dict_data%list(n)%value))
+       lengthData = size(transfer(value, char4transfer))
        allocate(dict_data%list(n)%value(lengthData))
        dict_data%list(n)%value = transfer(value, dict_data%list(n)%value)
        dict_data%list(n)%type  = 'log'

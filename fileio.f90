@@ -38,25 +38,21 @@
 !
 !############################################################################
 
-! DCD 12/8/10  removed rlat, rlon, ralt from parameter list
-    SUBROUTINE WRITENETCDF(prefix, ncgen_command, anal, ut, vt, yr, mo, da, hr, mn, se)
-
+    SUBROUTINE WRITENETCDF(prefix, anal, ut, vt, yr, mo, da, hr, mn, se)
 
       USE DTYPES_module
+      USE netcdf
+      USE OBAN_FIELDS
 
       implicit none
 
-      include 'opaws.inc'
-
 !---- input parameters
 
-      character(len=100) prefix       ! prefix file name
-      character(len=*) ncgen_command  ! path/executable for local "ncgen" command
+      character(len=*) prefix       ! prefix file name
       TYPE(ANALYSISGRID) anal
       real ut, vt                     ! storm translation velocity (m/s)
       integer yr, mo, da              ! year, month, and day
       integer hr, mn, se              ! hour, minute, and second
-
 
 !---- local variables
 
@@ -66,344 +62,353 @@
       real, allocatable :: sf(:)      ! scaling factors
       integer i, j, k, n, s, p
       integer ls                      ! string length
-      character(len=150) command
+      character(len=150) filename     ! output netcdf filename
+      
+!---- Interface block for SUBROUTINE CHECK
 
+      INTERFACE
+        SUBROUTINE CHECK(status, message)
+          integer, intent (in) :: status
+          character(len=*), optional :: message
+        END SUBROUTINE CHECK
+      END INTERFACE
+      
 !############################################################################
-!
-!     Get dimension sizes
 
+      integer ncid                    ! netCDF file ID
+
+!---- dimension lengths
+
+      integer, parameter :: long_string_len = 80
+      integer, parameter :: short_string_len = 8
+      integer, parameter :: date_string_len = 10
+      integer field_dims(5)
+
+!---- dimension IDs
+
+      integer fields_dim
+      integer pass_dim
+      integer long_string_dim
+      integer short_string_dim
+      integer date_string_dim
+      integer time_dim
+      integer x_dim
+      integer y_dim
+      integer z_dim
+      integer el_dim
+
+!---- variable IDs
+
+      integer start_date_id
+      integer end_date_id
+      integer start_time_id
+      integer end_time_id
+      integer bad_data_flag_id
+      integer grid_latitude_id
+      integer grid_longitude_id
+      integer grid_altitude_id
+      integer radar_latitude_id
+      integer radar_longitude_id
+      integer radar_altitude_id
+      integer x_min_id
+      integer y_min_id
+      integer x_max_id
+      integer y_max_id
+      integer x_spacing_id
+      integer y_spacing_id
+      integer x_id
+      integer y_id
+      integer z_id
+      integer el_id
+      integer z_spacing_id
+      integer u_translation_id
+      integer v_translation_id
+      integer field_names_id
+      integer elev_id
+      integer AZ_id
+      integer TIME_id
+      integer HEIGHT_id
+      integer field_ids(20)
+
+!---- variable shapes
+
+      integer start_date_dims(1)
+      integer end_date_dims(1)
+      integer start_time_dims(1)
+      integer end_time_dims(1)
+      integer x_dims(1)
+      integer y_dims(1)
+      integer z_dims(1)
+      integer el_dims(1)
+      integer field_names_dims(2)
+      integer fourd_dims(4)
+
+!---- variable declarations
+
+      integer bad_data_flag
+      real  grid_latitude
+      real  grid_longitude
+      real  grid_altitude
+      real  radar_latitude
+      real  radar_longitude
+      real  radar_altitude
+      real  x_min
+      real  y_min
+      real  x_max
+      real  y_max
+      real  x_spacing
+      real  y_spacing
+      real  x(size(anal%xg))
+      real  y(size(anal%yg))
+      real  z(size(anal%zg))
+      real  el(size(anal%zg))
+      real  z_spacing
+      real  u_translation
+      real  v_translation
+
+!---- attribute vectors
+
+      integer textval(1)
+      double precision doubleval(1)
+
+!---- strings
+
+      character (len=10) start_date
+      character (len=10) end_date
+      character (len=8) start_time
+      character (len=8) end_time
+      character (len=8) :: fieldname(6)
+
+!---- get dimension sizes                                                                                                                                                                                                   
       nx    = size(anal%xg)
       ny    = size(anal%yg)
       nz    = size(anal%zg)
       nfld  = size(anal%f,dim=4)
       npass = size(anal%f,dim=5)
-      
+
       write(6,*)
       write(6,FMT='(" WRITENETCDF -> INPUT DIMS NX:    ", i3)') nx
       write(6,FMT='(" WRITENETCDF -> INPUT DIMS NY:    ", i3)') ny
       write(6,FMT='(" WRITENETCDF -> INPUT DIMS NZ:    ", i3)') nz
       write(6,FMT='(" WRITENETCDF -> INPUT DIMS NPASS: ", i3)') npass
 
-! DCD 11/24/10
       allocate(sf(nfld))
       sf(:) = 1.0
 
-!############################################################################
-!
-! DCD 1/26/11:  commented this section out, since "bad" is no longer used for OPAWS2
-!   change bad data flag
-!    DO p = 1,npass
-!      DO n = 1,nfld
-!        DO k = 1,nz
-!          DO j = 1,ny
-!            DO i = 1,nx
-!              IF( anal%f(i,j,k,n,p) .eq. bad ) THEN
-!                anal%f(i,j,k,n,p) = sbad
-!              ENDIF
-!            ENDDO
-!          ENDDO
-!        ENDDO
-!      ENDDO
-!    ENDDO
+!---- write netcdf filename and open file
 
-!   open ascii file that will be converted to netcdf
+      ls = index(prefix, ' ') - 1
+      filename=prefix(1:ls)//".nc"
 
-    open(unit=11, file='ncgen.input', status='unknown')
+!---- enter define mode
 
-    ls = index(prefix, ' ') - 1
-    write(11,'(3A)') 'netcdf ', prefix(1:ls)//'.nc.', ' {'
+      call check(nf90_create(filename, nf90_clobber, ncid));
 
-!   "dimensions" section
+!---- define dimensions
+      
+      call check(nf90_def_dim(ncid, 'fields', nfld+4, fields_dim));
+      call check(nf90_def_dim(ncid, 'pass', npass, pass_dim));
+      call check(nf90_def_dim(ncid, 'long_string', long_string_len, long_string_dim));
+      call check(nf90_def_dim(ncid, 'short_string', short_string_len, short_string_dim));
+      call check(nf90_def_dim(ncid, 'date_string', date_string_len, date_string_dim));
+      call check(nf90_def_dim(ncid, 'time', NF90_UNLIMITED, time_dim));
+      call check(nf90_def_dim(ncid, 'x', nx, x_dim));
+      call check(nf90_def_dim(ncid, 'y', ny, y_dim));
+      call check(nf90_def_dim(ncid, 'z', nz, z_dim));
+      call check(nf90_def_dim(ncid, 'el', nz, el_dim));
 
-    write(11,'(A)') 'dimensions:'
-! DCD 11/24/10
-    write(11,'(T9, A, I0, A)')  'fields = ', nfld+4, ' ;'
-    write(11,'(T9, A, I0, A)')  'pass   = ', npass, ' ;'
-    write(11,'(T9,A)') 'long_string = 80 ;'
-    write(11,'(T9,A)') 'short_string = 8 ;'
-    write(11,'(T9,A)') 'date_string = 10 ;'
-    write(11,'(T9,A)') 'time = UNLIMITED ; // (1 currently)'
-    write(11,'(T9,A,I0,A)') 'x = ', nx, ' ;'
-    write(11,'(T9,A,I0,A)') 'y = ', ny, ' ;'
-    write(11,'(T9,A,I0,A)') 'z = ', nz, ' ;'
-    write(11,'(T9,A,I0,A)') 'el = ', nz, ' ;'
-  
-!   "variables" section
+!---- define variables
 
-    write(11,'(A)') 'variables:'
-    write(11,'(T9,A)') 'char start_date(date_string) ;'
-    write(11,'(T9,A)') 'char end_date(date_string) ;'
-    write(11,'(T9,A)') 'char start_time(short_string) ;'
-    write(11,'(T9,A)') 'char end_time(short_string) ;'
-    write(11,'(T9,A)') 'int bad_data_flag ;'
-    write(11,'(T9,A)') 'float grid_latitude ;'
-    write(11,'(T17,A)') 'grid_latitude:value = "Grid origin latitude" ;'
-    write(11,'(T17,A)') 'grid_latitude:units = "deg" ;'
-    write(11,'(T9,A)') 'float grid_longitude ;'
-    write(11,'(T17,A)') 'grid_longitude:value = "Grid origin longitude" ;'
-    write(11,'(T17,A)') 'grid_longitude:units = "deg" ;'
-    write(11,'(T9,A)') 'float grid_altitude ;'
-    write(11,'(T17,A)') 'grid_altitude:value = "Altitude of grid origin" ;'
-    write(11,'(T17,A)') 'grid_altitude:units = "km MSL" ;'
-    write(11,'(T9,A)') 'float radar_latitude ;'
-    write(11,'(T17,A)') 'radar_latitude:value = "Radar latitude" ;'
-    write(11,'(T17,A)') 'radar_latitude:units = "deg" ;'
-    write(11,'(T9,A)') 'float radar_longitude ;'
-    write(11,'(T17,A)') 'radar_longitude:value = "Radar longitude" ;'
-    write(11,'(T17,A)') 'radar_longitude:units = "deg" ;'
-    write(11,'(T9,A)') 'float radar_altitude ;'
-    write(11,'(T17,A)') 'radar_altitude:value = "Altitude of radar" ;'
-    write(11,'(T17,A)') 'radar_altitude:units = "km MSL" ;'
-    write(11,'(T9,A)') 'float x_min ;'
-    write(11,'(T17,A)') 'x_min:value = "The minimum x grid value" ;'
-    write(11,'(T17,A)') 'x_min:units = "km" ;'
-    write(11,'(T9,A)') 'float y_min ;'
-    write(11,'(T17,A)') 'y_min:value = "The minimum y grid value" ;'
-    write(11,'(T17,A)') 'y_min:units = "km" ;'
-    write(11,'(T9,A)') 'float x_max ;'
-    write(11,'(T17,A)') 'x_max:value = "The maximum x grid value" ;'
-    write(11,'(T17,A)') 'x_max:units = "km" ;'
-    write(11,'(T9,A)') 'float y_max ;'
-    write(11,'(T17,A)') 'y_max:value = "The maximum y grid value" ;'
-    write(11,'(T17,A)') 'y_max:units = "km" ;'
-    write(11,'(T9,A)') 'float x_spacing ;'
-    write(11,'(T17,A)') 'x_spacing:units = "km" ;'
-    write(11,'(T9,A)') 'float y_spacing ;'
-    write(11,'(T17,A)') 'y_spacing:units = "km" ;'
+      start_date_dims(1) = date_string_dim
+      call check(nf90_def_var(ncid, 'start_date', nf90_char, start_date_dims, start_date_id));
 
-    write(11,'(T9,A)') 'float x(x) ;'
-    write(11,'(T9,A)') 'float y(y) ;'
-    write(11,'(T9,A)') 'float z(z) ;'
-    write(11,'(T9,A)') 'float el(z) ;'
-    write(11,'(T9,A)') 'float z_spacing ;'
-    write(11,'(T9,A)') 'float u_translation ;'
-    write(11,'(T17,A)') 'u_translation:value = "storm motion u component" ;'
-    write(11,'(T17,A)') 'u_translation:units = "m/s" ;'
-    write(11,'(T9,A)') 'float v_translation ;'
-    write(11,'(T17,A)') 'v_translation:value = "storm motion v component" ;'
-    write(11,'(T17,A)') 'v_translation:units = "m/s" ;'
-    write(11,'(T9,A)') 'char field_names(fields, short_string) ;'
+      end_date_dims(1) = date_string_dim
+      call check(nf90_def_var(ncid, 'end_date', nf90_char, end_date_dims, end_date_id));
 
-    DO n = 1,nfld
-      ls = index(anal%name(n), ' ') - 1
-      write(11,'(T9,A,A,A)') 'float ', anal%name(n)(1:ls), '(time, pass, z, y, x) ;'
-      write(11,'(T17,A,A,ES14.7,A)') anal%name(n)(1:ls), ':scale_factor = ', sf(n), ' ;'
-      write(11,'(T17,A,A)') anal%name(n)(1:ls), ':add_offset = 0.0 ;'
-      write(11,'(T17,A,A,ES14.7,A)') anal%name(n)(1:ls), ':missing_value = ', sbad, ' ;'
-    ENDDO
+      start_time_dims(1) = short_string_dim
+      call check(nf90_def_var(ncid, 'start_time', nf90_char, start_time_dims, start_time_id));
 
-    write(11,'(T9,A,A,A)') 'float ', 'EL', '(time, z, y, x) ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'EL', ':scale_factor = ', sf(1), ' ;'
-    write(11,'(T17,A,A)') 'EL', ':add_offset = 0.0 ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'EL', ':missing_value = ', sbad, ' ;'
+      end_time_dims(1) = short_string_dim
+      call check(nf90_def_var(ncid, 'end_time', nf90_char, end_time_dims, end_time_id));
 
-    write(11,'(T9,A,A,A)') 'float ', 'AZ', '(time, z, y, x) ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'AZ', ':scale_factor = ', sf(1), ' ;'
-    write(11,'(T17,A,A)') 'AZ', ':add_offset = 0.0 ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'AZ', ':missing_value = ', sbad, ' ;'
+      call check(nf90_def_var(ncid, 'bad_data_flag', nf90_int, bad_data_flag_id));
+      call check(nf90_def_var(ncid, 'grid_latitude', nf90_float, grid_latitude_id));
+      call check(nf90_def_var(ncid, 'grid_longitude', nf90_float, grid_longitude_id));
+      call check(nf90_def_var(ncid, 'grid_altitude', nf90_float, grid_altitude_id));
+      call check(nf90_def_var(ncid, 'radar_latitude', nf90_float, radar_latitude_id));
+      call check(nf90_def_var(ncid, 'radar_longitude', nf90_float, radar_longitude_id));
+      call check(nf90_def_var(ncid, 'radar_altitude', nf90_float, radar_altitude_id))
+      call check(nf90_def_var(ncid, 'x_min', nf90_float, x_min_id));
+      call check(nf90_def_var(ncid, 'y_min', nf90_float, y_min_id));
+      call check(nf90_def_var(ncid, 'x_max', nf90_float, x_max_id));
+      call check(nf90_def_var(ncid, 'y_max', nf90_float, y_max_id));
+      call check(nf90_def_var(ncid, 'x_spacing', nf90_float, x_spacing_id));
+      call check(nf90_def_var(ncid, 'y_spacing', nf90_float, y_spacing_id));
 
-    write(11,'(T9,A,A,A)') 'float ', 'TIME', '(time, z, y, x) ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'TIME', ':scale_factor = ', sf(1), ' ;'
-    write(11,'(T17,A,A)') 'TIME', ':add_offset = 0.0 ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'TIME', ':missing_value = ', sbad, ' ;'
+      x_dims(1) = x_dim
+      call check(nf90_def_var(ncid, 'x', nf90_float, x_dims, x_id));
 
-! DCD 11/24/10
-    write(11,'(T9,A,A,A)') 'float ', 'HEIGHT', '(time, z, y, x) ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'HEIGHT', ':scale_factor = ', sf(1), ' ;'
-    write(11,'(T17,A,A)') 'HEIGHT', ':add_offset = 0.0 ;'
-    write(11,'(T17,A,A,ES14.7,A)') 'HEIGHT', ':missing_value = ', sbad, ' ;'
+      y_dims(1) = y_dim
+      call check(nf90_def_var(ncid, 'y', nf90_float, y_dims, y_id));
 
-!   "data" section
+      z_dims(1) = z_dim
+      call check(nf90_def_var(ncid, 'z', nf90_float, z_dims, z_id));
 
-    write(11,'(A)') 'data:'
-    write(11,*)
-    write(11,'(A,I2.2,A,I2.2,A,I4.4,A)') ' start_date = "', mo, '/', da, '/', yr, '" ;'
-    write(11,*)
-    write(11,'(A,I2.2,A,I2.2,A,I4.4,A)') ' end_date = "', mo, '/', da, '/', yr, '" ;'
-    write(11,*)
-    write(11,'(A,I2.2,A,I2.2,A,I2.2,A)') ' start_time = "', hr, ':', mn, ':', se, '" ;'
-    write(11,*)
-    write(11,'(A,I2.2,A,I2.2,A,I2.2,A)') ' end_time = "', hr, ':', mn, ':', se, '" ;'
-    write(11,*)
-    write(11,'(A,I0,A)') ' bad_data_flag = ', int(sbad), ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' grid_latitude = ', anal%glat, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' grid_longitude = ', anal%glon, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' grid_altitude = ', anal%galt, ' ;'
-    write(11,*)
-! DCD 12/8/10
-    write(11,'(A,ES14.7,A)') ' radar_latitude = ', anal%rlat, ' ;'
-    write(11,*)
-! DCD 12/8/10
-    write(11,'(A,ES14.7,A)') ' radar_longitude = ', anal%rlon, ' ;'
-    write(11,*)
-! DCD 12/8/10
-    write(11,'(A,ES14.7,A)') ' radar_altitude = ', anal%ralt, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' x_min = ', anal%xmin, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' y_min = ', anal%ymin, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' x_max = ', anal%xg(nx), ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' y_max = ', anal%xg(ny), ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' x_spacing = ', anal%dx, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' y_spacing = ', anal%dy, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' z_spacing = ', anal%dz, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' u_translation = ', ut, ' ;'
-    write(11,*)
-    write(11,'(A,ES14.7,A)') ' v_translation = ', vt, ' ;'
-    write(11,*)
+      el_dims(1) = z_dim
+      call check(nf90_def_var(ncid, 'el', nf90_float, el_dims, el_id));
 
-    write(11,'(A)', advance='no') ' x = '
-    DO i = 1,nx
-      write(11,'(ES14.7)', advance='no') anal%xg(i)
-      if (i.eq.nx) then
-        write(11,'(A)') ' ;'
-      else
-        write(11,'(A)', advance='no') ', '
-        if (mod(i,5).eq.4) write(11,*)
-      endif
-    ENDDO
-    write(11,*)
+      call check(nf90_def_var(ncid, 'z_spacing', nf90_float, z_spacing_id));
+      call check(nf90_def_var(ncid, 'u_translation', nf90_float, u_translation_id));
+      call check(nf90_def_var(ncid, 'v_translation', nf90_float, v_translation_id));
 
-    write(11,'(A)', advance='no') ' y = '
-    DO j = 1,ny
-      write(11,'(ES14.7)', advance='no') anal%yg(j)
-      if (j.eq.ny) then
-        write(11,'(A)') ' ;'
-      else
-        write(11,'(A)', advance='no') ', '
-        if (mod(j,5).eq.4) write(11,*)
-      endif
-    ENDDO
-    write(11,*)
+      field_names_dims(1) = short_string_dim
+      field_names_dims(2) = fields_dim
+      call check(nf90_def_var(ncid, 'field_names', nf90_char, field_names_dims, field_names_id));
 
-    write(11,'(A)', advance='no') ' z = '
-    DO k = 1,nz
-      write(11,'(ES14.7)', advance='no') anal%zg(k)
-      if (k.eq.nz) then
-        write(11,'(A)') ' ;'
-      else
-        write(11,'(A)', advance='no') ', '
-        if (mod(k,5).eq.4) write(11,*)
-      endif
-    ENDDO
-    write(11,*)
-
-    write(11,'(A)', advance='no') ' el = '
-    DO k = 1,nz
-      write(11,'(ES14.7)', advance='no') anal%zg(k)
-      if (k.eq.nz) then
-        write(11,'(A)') ' ;'
-      else
-        write(11,'(A)', advance='no') ', '
-        if (mod(k,5).eq.4) write(11,*)
-      endif
-    ENDDO
-    write(11,*)
-
-    write(11,'(A)') ' field_names = '
-    DO n = 1,nfld
-      write(11,'(A,A8,A)', advance='no') '  "', anal%name(n), '"'
-      write(11,'(A)') ','
-    ENDDO
-
-    write(11,'(A,A8,A)', advance='no') '  "','EL      ', '"'
-    write(11,'(A)') ','
-
-    write(11,'(A,A8,A)', advance='no') '  "','AZ      ', '"'
-    write(11,'(A)') ','
-
-    write(11,'(A,A8,A)', advance='no') '  "','TIME    ', '"'
-    write(11,'(A)') ','
-
-! DCD 11/24/10
-    write(11,'(A,A8,A)', advance='no') '  "','HEIGHT  ', '"'
-    write(11,'(A)') ';'
-
-!   Write 4D fields (nx, ny, nz, npass)
-
-    DO n = 1,nfld
-      write(11,*)
-      ls = index(anal%name(n), ' ') - 1
-      write(11,'(1X,A,A,A)') ' ', anal%name(n)(1:ls), ' ='
-
-      s = 0
-      DO p = 1,npass
-        DO k = 1,nz
-          DO j = 1,ny
-            DO i = 1,nx
-              write(11,'(ES14.7)', advance='no') anal%f(i,j,k,n,p)
-              s = s + 1
-              if (s.eq.(nx*ny*nz*npass)) then
-                write(11,'(A)') ' ;'
-              else
-                write(11,'(A)', advance='no') ', '
-                if (mod(s,5).eq.4) write(11,*)
-              endif
-            ENDDO
-          ENDDO
-        ENDDO
+      DO n = 1,nfld
+        fieldname(n)=anal%name(n)
       ENDDO
-    ENDDO
 
-!   Write 3D fields
+      fieldname(nfld+1)='EL'
+      fieldname(nfld+2)='AZ'
+      fieldname(nfld+3)='TIME'
+      fieldname(nfld+4)='HEIGHT'
 
-    DO n = 1,4
+      fourd_dims(1) = x_dim
+      fourd_dims(2) = y_dim
+      fourd_dims(3) = z_dim
+      fourd_dims(4) = time_dim
 
-      write(11,*)
-      IF( n .eq. 1 ) write(11,'(1X,A,A,A)') ' ', 'EL', ' ='
-      IF( n .eq. 2 ) write(11,'(1X,A,A,A)') ' ', 'AZ', ' ='
-      IF( n .eq. 3 ) write(11,'(1X,A,A,A)') ' ', 'TIME', ' ='
-      IF( n .eq. 4 ) write(11,'(1X,A,A,A)') ' ', 'HEIGHT', ' ='
+      call check(nf90_def_var(ncid, 'EL', nf90_float, fourd_dims, elev_id));
+      call check(nf90_def_var(ncid, 'AZ', nf90_float, fourd_dims, AZ_id));
+      call check(nf90_def_var(ncid, 'TIME', nf90_float, fourd_dims, TIME_id));
+      call check(nf90_def_var(ncid, 'HEIGHT', nf90_float, fourd_dims, HEIGHT_id));
 
-      s = 0
-      DO k = 1,nz
-        DO j = 1,ny
-          DO i = 1,nx
-            IF( n .eq. 1 ) write(11,'(ES14.7)', advance='no') anal%el(i,j,k)
-            IF( n .eq. 2 ) write(11,'(ES14.7)', advance='no') anal%az(i,j,k)
-            IF( n .eq. 3 ) write(11,'(ES14.7)', advance='no') anal%time(i,j,k)
-            IF( n .eq. 4 ) write(11,'(ES14.7)', advance='no') anal%height(i,j,k)
-            s = s + 1
-            if (s.eq.(nx*ny*nz)) then
-              write(11,'(A)') ' ;'
-            else
-              write(11,'(A)', advance='no') ', '
-              if (mod(s,5).eq.4) write(11,*)
-            endif
-          ENDDO
-        ENDDO
+!---- Define field variables (e.g. DBZ, VEL) and assign attributes
+
+      field_dims(1) = x_dim
+      field_dims(2) = y_dim
+      field_dims(3) = z_dim
+      field_dims(4) = pass_dim
+      field_dims(5) = time_dim
+
+      DO n = 1,nfld
+        ls = index(anal%name(n), ' ') - 1
+        call check(nf90_def_var(ncid, anal%name(n)(1:ls), nf90_float, field_dims, field_ids(n)))
+        call check(nf90_put_att(ncid, field_ids(n), 'scale_factor', sf(n)))
+        call check(nf90_put_att(ncid, field_ids(n), 'add_offset', 0.0))
+        call check(nf90_put_att(ncid, field_ids(n), 'missing_value', sbad))
       ENDDO
-    ENDDO
 
+!---- assign variable attributes
 
-!   Write final character and then close file.
+      call check(nf90_put_att(ncid, grid_latitude_id, 'value', 'Grid origin latitude'))
+      call check(nf90_put_att(ncid, grid_latitude_id, 'units', 'deg'))
 
-    write(11,'(A)') '}'
-    close(11)
+      call check(nf90_put_att(ncid, grid_longitude_id, 'value', 'Grid origin longitude'))
+      call check(nf90_put_att(ncid, grid_longitude_id, 'units', 'deg'))
 
-!   Convert ascii file to netcdf.
+      call check(nf90_put_att(ncid, grid_altitude_id, 'value', 'Altitude of grid origin'))
+      call check(nf90_put_att(ncid, grid_altitude_id, 'units', 'km MSL'))
 
-    ls = index(prefix, ' ') - 1
-    write(command,'(A,A,A)') ncgen_command//' -o ', prefix(1:ls)//".nc", ' ncgen.input'
+      call check(nf90_put_att(ncid, radar_latitude_id, 'value', 'Radar latitude'))
+      call check(nf90_put_att(ncid, radar_latitude_id, 'units', 'deg'))
 
-    write(6,FMT='(1x,A,A)') 'Now executing command = ', command
+      call check(nf90_put_att(ncid, radar_longitude_id, 'value', 'Radar longitude'))
+      call check(nf90_put_att(ncid, radar_longitude_id, 'units', 'deg'))
 
-    call system(command)
+      call check(nf90_put_att(ncid, radar_altitude_id, 'value', 'Altitude of radar'))
+      call check(nf90_put_att(ncid, radar_altitude_id, 'units', 'km MSL'))
+
+      call check(nf90_put_att(ncid, x_min_id, 'value', 'The minimum x grid value'))
+      call check(nf90_put_att(ncid, x_min_id, 'units', 'km'))
+
+      call check(nf90_put_att(ncid, y_min_id, 'value', 'The minimum y grid value'))
+      call check(nf90_put_att(ncid, y_min_id, 'units', 'km'))
+
+      call check(nf90_put_att(ncid, x_max_id, 'value', 'The maximum x grid value'))
+      call check(nf90_put_att(ncid, x_max_id, 'units', 'km'))
+
+      call check(nf90_put_att(ncid, y_max_id, 'value', 'The maximum y grid value'))
+      call check(nf90_put_att(ncid, y_max_id, 'units', 'km'))
+
+      call check(nf90_put_att(ncid, x_spacing_id, 'units', 'km'))
+      call check(nf90_put_att(ncid, y_spacing_id, 'units', 'km'))
+
+      call check(nf90_put_att(ncid, u_translation_id, 'value', 'storm motion u component'))
+      call check(nf90_put_att(ncid, u_translation_id, 'units', 'm/s'))
+
+      call check(nf90_put_att(ncid, v_translation_id, 'value', 'storm motion v component'))
+      call check(nf90_put_att(ncid, v_translation_id, 'units', 'm/s'))
+
+      call check(nf90_put_att(ncid, elev_id, 'scale_factor', sf(1)))
+      call check(nf90_put_att(ncid, elev_id, 'add_offset', 0.0))
+      call check(nf90_put_att(ncid, elev_id, 'missing_value', sbad))
+
+      call check(nf90_put_att(ncid, AZ_id, 'scale_factor', sf(1)))
+      call check(nf90_put_att(ncid, AZ_id, 'add_offset', 0.0))
+      call check(nf90_put_att(ncid, AZ_id, 'missing_value', sbad))
+
+      call check(nf90_put_att(ncid, TIME_id, 'scale_factor', sf(1)))
+      call check(nf90_put_att(ncid, TIME_id, 'add_offset', 0.0))
+      call check(nf90_put_att(ncid, TIME_id, 'missing_value', sbad))
+
+      call check(nf90_put_att(ncid, HEIGHT_id, 'scale_factor', sf(1)))
+      call check(nf90_put_att(ncid, HEIGHT_id, 'add_offset', 0.0))
+      call check(nf90_put_att(ncid, HEIGHT_id, 'missing_value', sbad))
+
+!---- leave define mode
+
+      call check(nf90_enddef(ncid));
+
+!---- write variables                                                                                                                                                                                                     
+
+      write(start_date, '(I2.2, A, I2.2, A, I4.4)') mo, '/', da, '/', yr
+      write(end_date, '(I2.2, A, I2.2, A, I4.4)') mo, '/', da, '/', yr
+      write(start_time, '(I2.2, A, I2.2, A, I2.2)') hr, ':', mn, ':', se
+      write(end_time, '(I2.2, A, I2.2, A, I2.2)') hr, ':', mn, ':', se
+
+      call check( nf90_put_var(ncid, start_date_id, start_date) )
+      call check( nf90_put_var(ncid, end_date_id, end_date) )
+      call check( nf90_put_var(ncid, start_time_id, start_time) )
+      call check( nf90_put_var(ncid, end_time_id, end_time) )
+      call check( nf90_put_var(ncid, bad_data_flag_id, int(sbad)) )
+      call check( nf90_put_var(ncid, grid_latitude_id, anal%glat) )
+      call check( nf90_put_var(ncid, grid_longitude_id, anal%glon) )
+      call check( nf90_put_var(ncid, grid_altitude_id, anal%galt) )
+      call check( nf90_put_var(ncid, radar_latitude_id, anal%rlat) )
+      call check( nf90_put_var(ncid, radar_longitude_id, anal%rlon) )
+      call check( nf90_put_var(ncid, radar_altitude_id, anal%ralt) )
+      call check( nf90_put_var(ncid, x_min_id, anal%xmin) )
+      call check( nf90_put_var(ncid, y_min_id, anal%ymin) )
+      call check( nf90_put_var(ncid, x_max_id, anal%xg(nx)) )
+      call check( nf90_put_var(ncid, y_max_id, anal%yg(ny)) )
+      call check( nf90_put_var(ncid, x_spacing_id, anal%dx) )
+      call check( nf90_put_var(ncid, y_spacing_id, anal%dy) )
+      call check( nf90_put_var(ncid, z_spacing_id, anal%dz) )
+      call check( nf90_put_var(ncid, u_translation_id, ut) )
+      call check( nf90_put_var(ncid, v_translation_id, vt) )
+      call check( nf90_put_var(ncid, x_id, anal%xg) )
+      call check( nf90_put_var(ncid, y_id, anal%yg) )
+      call check( nf90_put_var(ncid, z_id, anal%zg) )
+      call check( nf90_put_var(ncid, el_id, anal%zg) )
+      call check( nf90_put_var(ncid, elev_id, anal%el) )
+      call check( nf90_put_var(ncid, AZ_id, anal%az) )
+      call check( nf90_put_var(ncid, TIME_id, anal%time) )
+      call check( nf90_put_var(ncid, HEIGHT_id, anal%height) )
+      call check( nf90_put_var(ncid, field_names_id, fieldname) )
+      
+      DO n = 1,nfld
+        call check( nf90_put_var(ncid, field_ids(n), anal%f(:,:,:,n,:)) )
+      ENDDO
+
+      call check( nf90_close(ncid) )
 
     deallocate(sf)
 
     RETURN
-    END
 
+END SUBROUTINE WRITENETCDF
 !############################################################################
 !
 !     ##################################################################
@@ -676,43 +681,56 @@
 
     num_obs = 0
 
+! Need to check first to see if variable index NE 0  BEFORE we use it to check value,
+!      else we get an out of bounds error
+
     DO k = 1,nswp
       DO j = 1,ny
         DO i = 1,nx
-          IF ( (dbz_index                     .ne. 0)    .and. &
-               (anal%f(i,j,k,dbz_index,npass) .ne. sbad) .and. &
-               (anal%az(i,j,k)                .ne. sbad) .and. &
+
+          IF ( (anal%az(i,j,k)                .ne. sbad) .and. &
                (anal%el(i,j,k)                .ne. sbad) .and. &
                (anal%height(i,j,k)            .ne. sbad)         ) THEN
-            num_obs = num_obs + 1
-! DCD 12/1/10
-            use_obs_kind_reflectivity = .true.
-            if (use_clear_air_type) use_obs_kind_clearair_reflectivity = .true.
-          ENDIF
-          IF ( (vr_index                      .ne. 0)    .and. &
-               (anal%f(i,j,k,vr_index,npass)  .ne. sbad) .and. &
-               (anal%az(i,j,k)                .ne. sbad) .and. &
-               (anal%el(i,j,k)                .ne. sbad) .and. &
-               (anal%height(i,j,k)            .ne. sbad)         ) THEN            
-            num_obs = num_obs + 1
-            use_obs_kind_Doppler_velocity = .true.
-          ENDIF
-          IF ( (kdp_index                     .ne. 0)    .and. &
-               (anal%f(i,j,k,kdp_index,npass) .ne. sbad) .and. &
-               (anal%az(i,j,k)                .ne. sbad) .and. &
-               (anal%el(i,j,k)                .ne. sbad) .and. &
-               (anal%height(i,j,k)            .ne. sbad)         ) THEN
-            num_obs = num_obs + 1
-            use_obs_kind_kdp = .true.
-          ENDIF
-          IF ( (zdr_index                     .ne. 0)    .and. &
-               (anal%f(i,j,k,zdr_index,npass) .ne. sbad) .and. &
-               (anal%az(i,j,k)                .ne. sbad) .and. &
-               (anal%el(i,j,k)                .ne. sbad) .and. &
-               (anal%height(i,j,k)            .ne. sbad)         ) THEN
-            num_obs = num_obs + 1
-            use_obs_kind_zdr = .true.
-          ENDIF
+
+            IF ( dbz_index .ne. 0 ) THEN
+
+              IF( anal%f(i,j,k,dbz_index,npass) .ne. sbad ) THEN
+                num_obs = num_obs + 1
+                use_obs_kind_reflectivity = .true.
+                IF (use_clear_air_type) use_obs_kind_clearair_reflectivity = .true.
+              ENDIF
+
+            ENDIF
+
+            IF ( vr_index .ne. 0 ) THEN
+
+              IF( anal%f(i,j,k,vr_index,npass) .ne. sbad ) THEN
+                num_obs = num_obs + 1
+                use_obs_kind_Doppler_velocity = .true.
+              ENDIF
+
+            ENDIF
+
+            IF ( kdp_index .ne. 0 ) THEN
+
+              IF( anal%f(i,j,k,kdp_index,npass) .ne. sbad ) THEN
+                num_obs = num_obs + 1
+                use_obs_kind_kdp = .true.
+              ENDIF
+
+            ENDIF
+
+            IF ( zdr_index .ne. 0 ) THEN
+
+              IF( anal%f(i,j,k,zdr_index,npass) .ne. sbad ) THEN
+                num_obs = num_obs + 1
+                use_obs_kind_zdr = .true.
+              ENDIF
+
+            ENDIF
+
+          ENDIF  ! END OUTER CHECK FOR GOOD LOCATION
+
         ENDDO
       ENDDO
     ENDDO
@@ -746,94 +764,94 @@
       DO j = 1,ny
         DO i = 1,nx
 
-          x = anal%xg(i)
-          y = anal%yg(j)
+! Again - check to see if location is valid, then check individual variables
 
-! DCD 12/1/10
-          CALL xy_to_ll(lat, lon, map_proj, x, y, glat, glon)
-
-          olat    = lat
-          olon    = lon
-          oheight = 1000.0 * (anal%galt + anal%height(i,j,k))
-
-! DCD 12/1/10
-          IF( (dbz_index                     .ne. 0)    .and. &
-              (anal%f(i,j,k,dbz_index,npass) .ne. sbad) .and. &
-              (anal%az(i,j,k)                .ne. sbad) .and. &
+          IF( (anal%az(i,j,k)                .ne. sbad) .and. &
               (anal%el(i,j,k)                .ne. sbad) .and. &
               (anal%height(i,j,k)            .ne. sbad)      ) THEN   
-         
-            num_obs        = num_obs + 1
-            dbz_count      = dbz_count + 1
-            ob_value       = anal%f(i,j,k,dbz_index,npass)
-            error_variance = anal%error(dbz_index)**2
+
+            x = anal%xg(i)
+            y = anal%yg(j)
+
+            CALL xy_to_ll(lat, lon, map_proj, x, y, glat, glon)
+
+            olat    = lat
+            olon    = lon
+            oheight = 1000.0 * (anal%galt + anal%height(i,j,k))
+
+            IF( dbz_index .ne. 0) THEN
+              IF( anal%f(i,j,k,dbz_index,npass) .ne. sbad) THEN
+                num_obs        = num_obs + 1
+                dbz_count      = dbz_count + 1
+                ob_value       = anal%f(i,j,k,dbz_index,npass)
+                error_variance = anal%error(dbz_index)**2
 
 ! DCD 12/1/10
-            IF( dbz_ob_is_clear_air(i,j,k) ) THEN
-                clear_air_count = clear_air_count + 1
-              CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                             &
-                                 olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),                 &
-                                 0.0, dbz_count, rlat, rlon, rheight,                                    &
-                                 obs_kind_clearair_reflectivity, anal%sec(k), anal%day(k), error_variance, qc_value)
-            ELSE      
-              CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                    &
-                                 olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),        &
-                                 0.0, dbz_count, rlat, rlon, rheight,                           &
-                                 obs_kind_reflectivity, anal%sec(k), anal%day(k), error_variance, qc_value)
-            ENDIF
-          ENDIF
+                IF( dbz_ob_is_clear_air(i,j,k) ) THEN
+                  clear_air_count = clear_air_count + 1
+                  CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                   &
+                                     olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),       &
+                                     0.0, dbz_count, rlat, rlon, rheight,                          &
+                                     obs_kind_clearair_reflectivity, anal%sec(k), anal%day(k),     &
+                                     error_variance, qc_value)
+                ELSE      
+                  CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                   &
+                                     olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),       &
+                                     0.0, dbz_count, rlat, rlon, rheight,                          &
+                                     obs_kind_reflectivity, anal%sec(k), anal%day(k),              &
+                                     error_variance, qc_value)
+                ENDIF  ! end clear air
+
+              ENDIF    ! end valid data
+            ENDIF    ! end DBZ_INDEX
           
-          IF( (vr_index                      .ne. 0)    .and. &
-              (anal%f(i,j,k,vr_index,npass)  .ne. sbad) .and. &
-              (anal%az(i,j,k)                .ne. sbad) .and. &
-              (anal%el(i,j,k)                .ne. sbad) .and. &
-              (anal%height(i,j,k)            .ne. sbad)      ) THEN      
-      
-            num_obs        = num_obs + 1
-            vr_count       = vr_count + 1
-            ob_value       = anal%f(i,j,k,vr_index,npass)
-            error_variance = anal%error(vr_index)**2
+            IF( vr_index .ne. 0) THEN
+              IF( anal%f(i,j,k,vr_index,npass) .ne. sbad) THEN
+                num_obs        = num_obs + 1
+                vr_count       = vr_count + 1
+                ob_value       = anal%f(i,j,k,vr_index,npass)
+                error_variance = anal%error(vr_index)**2
 
-            CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                          &
-                               olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),              &
-! DCD 11/26/10
-                               sweep_info%Nyquist_vel(vr_index,k), vr_count, rlat, rlon, rheight,   &
-                               obs_kind_Doppler_velocity, anal%sec(k), anal%day(k), error_variance, qc_value)
-          ENDIF
+                CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                         &
+                                   olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),             &
+                                   sweep_info%Nyquist_vel(vr_index,k), vr_count, rlat, rlon, rheight,  &
+                                   obs_kind_Doppler_velocity, anal%sec(k), anal%day(k),                &
+                                   error_variance, qc_value)
 
-          IF( (kdp_index                     .ne. 0)    .and. &
-              (anal%f(i,j,k,kdp_index,npass) .ne. sbad) .and. &
-              (anal%az(i,j,k)                .ne. sbad) .and. &
-              (anal%el(i,j,k)                .ne. sbad) .and. &
-              (anal%height(i,j,k)            .ne. sbad)      ) THEN      
-      
-            num_obs        = num_obs + 1
-            kdp_count      = kdp_count + 1
-            ob_value       = anal%f(i,j,k,kdp_index,npass)
-            error_variance = anal%error(kdp_index)**2
+              ENDIF ! end valid data
+            ENDIF   ! end vr_index
 
-            CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                   &
-                               olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),       &
-                               0.0, kdp_count, rlat, rlon, rheight,                          &
-                               obs_kind_kdp, anal%sec(k), anal%day(k), error_variance, qc_value)
-          ENDIF
+            IF( kdp_index .ne. 0) THEN
+              IF(anal%f(i,j,k,kdp_index,npass) .ne. sbad) THEN
+                num_obs        = num_obs + 1
+                kdp_count      = kdp_count + 1
+                ob_value       = anal%f(i,j,k,kdp_index,npass)
+                error_variance = anal%error(kdp_index)**2
 
-          IF( (zdr_index                     .ne. 0)    .and. &
-              (anal%f(i,j,k,zdr_index,npass) .ne. sbad) .and. &
-              (anal%az(i,j,k)                .ne. sbad) .and. &
-              (anal%el(i,j,k)                .ne. sbad) .and. &
-              (anal%height(i,j,k)            .ne. sbad)      ) THEN      
-      
-            num_obs        = num_obs + 1
-            zdr_count      = zdr_count + 1
-            ob_value       = anal%f(i,j,k,zdr_index,npass)
-            error_variance = anal%error(zdr_index)**2
+                CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                   &
+                                   olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),       &
+                                   0.0, kdp_count, rlat, rlon, rheight,                          &
+                                   obs_kind_kdp, anal%sec(k), anal%day(k), error_variance, qc_value)
 
-            CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                   &
-                               olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),       &
-                               0.0, zdr_count, rlat, rlon, rheight,                          &
-                               obs_kind_zdr, anal%sec(k), anal%day(k), error_variance, qc_value)
-          ENDIF
+              ENDIF  ! end valid data
+            ENDIF ! end kdp_index
+
+            IF(zdr_index .ne. 0) THEN
+              IF(anal%f(i,j,k,zdr_index,npass) .ne. sbad) THEN
+                num_obs        = num_obs + 1
+                zdr_count      = zdr_count + 1
+                ob_value       = anal%f(i,j,k,zdr_index,npass)
+                error_variance = anal%error(zdr_index)**2
+
+                CALL write_DART_ob(fi, num_obs, ob_value, 0.0,                                   &
+                                   olat, olon, oheight, 3, anal%az(i,j,k), anal%el(i,j,k),       &
+                                   0.0, zdr_count, rlat, rlon, rheight,                          &
+                                   obs_kind_zdr, anal%sec(k), anal%day(k), error_variance, qc_value)
+
+              ENDIF  ! end valid data
+            ENDIF  ! end zdr_index
+
+          ENDIF  ! end valid location
 
         ENDDO
       ENDDO
@@ -885,7 +903,7 @@
 
 !---- input parameters
 
-      character(len=100) ncfile         ! netcdf file name
+      character(len=80) ncfile         ! netcdf file name
       character(len=*) ncgen_command  ! path/executable for local "ncgen" command
       integer nfld                      ! number of fields
       character(len=8) fname(nfld)      ! field names
@@ -1185,7 +1203,7 @@
 
 !---- input parameters
 
-      character(len=100) ncfile         ! input netcdf file name
+      character(len=80) ncfile         ! input netcdf file name
       character(len=8) fname            ! field name
       character(len=*) stat_name        ! name of statistical field
       real glon, glat                   ! latitude and longitude of grid origin (deg)
@@ -1474,7 +1492,7 @@
 
 !---- input parameters
 
-      character(len=100) ncfile    ! netcdf file name
+      character(len=80) ncfile    ! netcdf file name
 
 !---- returned variables
 
@@ -1787,116 +1805,157 @@
 !
 !############################################################################
 
-      subroutine write_beam_info(ncfile, ncgen_command, nswp, num_beams, beam_info)
+      SUBROUTINE WRITE_BEAM_INFO(ncfile, nswp, num_beams, beam_info)
 
+      USE netcdf
       implicit none
-
       include 'opaws.inc'
 
 !---- input parameters
 
-      character(len=100) ncfile             ! netcdf file name
-      character(len=*) ncgen_command        ! path/executable for local "ncgen" command
+      character(len=*) ncfile               ! netcdf file name
       integer nswp                          ! number of sweeps
       integer num_beams(nswp)               ! number of beams in each sweep
       real beam_info(maxrays,nswp,3)        ! beam information:
                                             !   (1) time offset (s) from central time
                                             !   (2) azimuth angle (deg)
                                             !   (3) elevation angle (deg)
+                                            
+!---- Interface block for SUBROUTINE CHECK
+
+      INTERFACE
+        SUBROUTINE CHECK(status, message)
+          integer, intent (in) :: status
+          character(len=*), optional :: message
+        END SUBROUTINE CHECK
+      END INTERFACE
 
 !---- local variables
+      integer i, j
+      
+! netCDF id
+      integer  ncid
+! dimension ids
+      integer  nswp_dim
+      integer  maxrays_dim
+      
+! variable ids
+      integer  num_beams_id
+      integer  time_id
+      integer  az_id
+      integer  el_id
+      
+! rank (number of dimensions) for each variable
+      integer, parameter :: num_beams_rank = 1
+      integer, parameter :: time_rank      = 2
+      integer, parameter :: az_rank        = 2
+      integer, parameter :: el_rank        = 2
+      
+! variable shapes
+      integer  num_beams_dims(num_beams_rank)
+      integer  time_dims(time_rank)
+      integer  az_dims(az_rank)
+      integer  el_dims(el_rank)
+      
+! variables variables
+      real  time(maxrays, nswp)
+      real  az(maxrays, nswp)
+      real  el(maxrays, nswp)
+            
+! enter define mode
+      call check( nf90_create('beam_info.nc', NF90_CLOBBER, ncid), &                               
+                               message='Error opening file')
 
-      integer ls                            ! string length
-      character(len=150) command
-      integer s, i, j, n
+! define dimensions
+      call check( nf90_def_dim(ncid, 'nswp', nswp, nswp_dim), &
+                               message='Error defining nswp dimension')
+      
+      call check( nf90_def_dim(ncid, 'maxrays', maxrays, maxrays_dim ), &
+                               message='Error defining nswp dimension')
+ 
+! define variables
+      call check( nf90_def_var(ncid, 'num_beams', NF90_INT, num_beams_id), &
+                               message='Error defining num_beams variable')
 
+      time_dims(2) = nswp_dim
+      time_dims(1) = maxrays_dim
+      call check( nf90_def_var(ncid, 'time', NF90_REAL, time_id), &
+                               message='Error defining num_beams variable')
 
-!     open ascii file that will be converted to netcdf
+      az_dims(2) = nswp_dim
+      az_dims(1) = maxrays_dim
+      call check( nf90_def_var(ncid, 'az', NF90_REAL, az_id), &
+                               message='Error defining azimuth variable')
 
-      open(unit=11, file='ncgen.input', status='unknown')
+      el_dims(2) = nswp_dim
+      el_dims(1) = maxrays_dim
+      call check( nf90_def_var(ncid, 'el', NF90_REAL,  el_id), &
+                               message='Error defining elevation variable')
+     
+! assign attributes
+      call check( nf90_put_att(ncid, num_beams_id, 'description', 'number of beams in sweep'), &
+                               message='Error writing num_beams description attribute')
+      
+      call check( nf90_put_att(ncid, time_id, 'description', 'time offset from base time'), &
+                               message='Error writing time description attribute')
+      
+      call check( nf90_put_att(ncid, time_id, 'units', 's'), &
+                               message='Error writing time units attribute')
+      
+      call check( nf90_put_att(ncid, az_id, 'description', 'azimuth angle'), &
+                                message='Error writing azimuthal description attribute')
+      
+      call check( nf90_put_att(ncid, az_id, 'units','deg'), &
+                               message='Error writing azimuthal units attribute')
+      
+      
+      call check( nf90_put_att(ncid, el_id, 'description', 'elevation angle'), &
+                               message='Error writing elevation description attribute')
+      
+      call check( nf90_put_att(ncid, el_id, 'units', 'deg'), &
+                               message='Error writing elevation units attribute')
+      
+! leave define mode
+      call check( nf90_enddef(ncid), message='Error leaving define mode')
+            
+! store num_beams
+      call check( nf90_put_var(ncid, num_beams_id, num_beams), message='Error writing num_beams variable')
+      
+! store time
+      DO i = 1,nswp
+        DO j = 1,maxrays
+            time(j,i) = beam_info(j,i,1)
+            az(j,i)   = beam_info(j,1,2)
+            el(j,i)   = beam_info(j,i,3)
+        ENDDO
+      ENDDO
+      
+      call check( nf90_put_var(ncid, time_id, time), message='Error writing time variable')
+      call check( nf90_put_var(ncid, az_id, az) , message='Error writing azimuthal variable')
+      call check( nf90_put_var(ncid, el_id, el), message='Error writing elevation variable')
+      
+      call check( NF90_CLOSE(ncid), message='Error closing beaminfo file: ')
+      
+    RETURN
+    END SUBROUTINE WRITE_BEAM_INFO
+      
+    SUBROUTINE CHECK(status, message)
+    
+      USE NETCDF
+      integer, intent (in) :: status
+      character(len=*), optional :: message
+    
+      IF( status /= nf90_noerr ) THEN 
+        IF( present(message) ) THEN
+          write(6,*), message//"  "//trim(nf90_strerror(status))
+          stop "Stopped by Subroutine CHECK"
+        ELSE
+          write(6,*) trim(nf90_strerror(status))
+          stop "Stopped by Subroutine CHECK"
+        ENDIF
+      END IF
+      
+    RETURN
+    END SUBROUTINE CHECK  
 
-      ls = index(ncfile, ' ') - 1
-      write(11,'(3A)') 'netcdf ', ncfile(1:ls), ' {'
-
-!     "dimensions" section
-
-      write(11,'(A)') 'dimensions:'
-      write(11,'(T9, A, I0, A)')  'nswp = ', nswp, ' ;'
-      write(11,'(T9, A, I0, A)')  'maxrays = ', maxrays, ' ;'
-
-!     "variables" section
-
-      write(11,'(A)') 'variables:'
-
-      write(11,'(T9,A)') 'int num_beams(nswp) ;'
-      write(11,'(T17,A)') 'num_beams:description = "number of beams in sweep" ;'
-
-      write(11,'(T9,A)') 'float time(nswp,maxrays) ;'
-      write(11,'(T17,A)') 'time:description = "time offset from base time" ;'
-      write(11,'(T17,A)') 'time:units = "s" ;'
-
-      write(11,'(T9,A)') 'float az(nswp,maxrays) ;'
-      write(11,'(T17,A)') 'az:description = "azimuth angle" ;'
-      write(11,'(T17,A)') 'az:units = "deg" ;'
-
-      write(11,'(T9,A)') 'float el(nswp,maxrays) ;'
-      write(11,'(T17,A)') 'el:description = "elevation angle" ;'
-      write(11,'(T17,A)') 'el:units = "deg" ;'
-
-!     "data" section
-
-      write(11,'(A)') 'data:'
-
-      write(11,*)
-      write(11,'(1X,A)') ' num_beams ='
-      s = 0
-      do j=1, nswp
-        write(11,'(I0)', advance='no') num_beams(j)
-        s = s + 1
-        if (s.eq.(nswp)) then
-          write(11,'(A)') ' ;'
-        else
-          write(11,'(A)', advance='no') ', '
-          if (mod(s,5).eq.0) write(11,*)
-        endif
-      enddo
-
-      do n=1, 3
-
-        write(11,*)
-        if (n.eq.1) write(11,'(1X,A)') ' time ='
-        if (n.eq.2) write(11,'(1X,A)') ' az ='
-        if (n.eq.3) write(11,'(1X,A)') ' el ='
-
-        s = 0
-        do i=1, nswp
-          do j=1, maxrays
-            write(11,'(ES14.7)', advance='no') beam_info(j,i,n)
-            s = s + 1
-            if (s.eq.(maxrays*nswp)) then
-              write(11,'(A)') ' ;'
-            else
-              write(11,'(A)', advance='no') ', '
-              if (mod(s,5).eq.0) write(11,*)
-            endif
-          enddo
-        enddo
-
-      enddo
-
-!     Write final character and then close file.
-
-      write(11,'(A)') '}'
-      close(11)
-
-!     Convert ascii file to netcdf.
-
-      write(command,'(A,A,A)') ncgen_command//' -o ', ncfile(1:ls), ' ncgen.input'
-
-      write(6,FMT='(1x,A,A)') 'Now executing command = ', command
-
-      call system(command)
-
-      return
-      end
 

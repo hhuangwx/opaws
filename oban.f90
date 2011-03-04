@@ -87,10 +87,9 @@ PROGRAM OBAN
   
   implicit none
 
-!  include 'opaws.inc'            ! now included in OBAN_FIELDS module
   include 'v5df.h'
 
-  character(LEN=80), parameter :: version = "Version 2.0 beta:  Updated January 28, 2011 [DCD]"
+  character(LEN=128), parameter :: version = "Version 2.0 beta:  Updated January 28, 2011 [DCD]"
 
   integer i, j, k, ns, np, nf                ! loop variables
   integer ls                                 ! length of input string
@@ -110,14 +109,14 @@ PROGRAM OBAN
                                                !   (2) azimuth angle (deg)
                                                !   (3) elevation angle (deg)
   integer, allocatable :: num_beams(:)         ! number of beams in each sweep
-  character(len=100) beam_info_file            ! name of netcdf file containing beam information
+  character(len=128) beam_info_file            ! name of netcdf file containing beam information
   parameter(beam_info_file = 'beam_info.nc')
 
-  character(len=132) path                    ! path name (e.g., '/data/swp*DOW2*') of sweep files to be read in
-  character(len=132) infile                  ! input parameter file name
-  character(len=200) sfname0                 ! sweep file name temp variable
-  character(len=150) command                 ! command to be executed at unix command line
-  integer status                             ! status flag returned from unix command
+  character(len=128) path                      ! path name (e.g., '/data/swp*DOW2*') of sweep files to be read in
+  character(len=128) infile                    ! input parameter file name
+  character(len=128) sfname0                   ! sweep file name temp variable
+  character(len=128) command                   ! command to be executed at unix command line
+  integer status                               ! status flag returned from unix command
 
   integer indx, iargc
   integer index, system, iostat
@@ -219,7 +218,7 @@ PROGRAM OBAN
     open(unit=11, file='sweep_file_list.txt', status='old')     ! read sweep file names
     DO ns = 1,nswp
       read(11,'(A)',end=12) vol%filename(ns)
-      write(6,FMT='(2x,"SWP filename:  ",i3.3,1x,a80)') ns, vol%filename(ns)
+      write(6,FMT='(2x,"SWP filename:  ",i3.3,1x,a)') ns, trim(vol%filename(ns))
     ENDDO
 
 12  CONTINUE
@@ -242,7 +241,7 @@ PROGRAM OBAN
     
     DO ns = 1,nswp
       read(lunr,'(A)') vol%filename(ns)
-      write(6,FMT='("SWP filename:  ",i3.3,1x,a80)') ns, vol%filename(ns)
+      write(6,FMT='("SWP filename:  ",i3.3,1x,a)') ns, trim(vol%filename(ns))
     ENDDO
     close(lunr)
 
@@ -367,7 +366,6 @@ PROGRAM OBAN
     write(6,*) 'radar_data_format = 2 (netcdf -- FORAY / WDSS-II)'
   endif
   write(6,*) 'Number of sweep files = ', nswp
-  write(6,*) 'ncgen path/executable = ', ncgen_command
 
   ls = index(output_prefix, ' ') - 1
 
@@ -416,21 +414,17 @@ PROGRAM OBAN
 
   anal%xmin = xmin
   anal%ymin = ymin
-! DCD 12/9/10  replaced 0.0 with zmin, which is now set to a default value in the OBAN_PARAMETERS module
   anal%zmin = zmin
 
   call grid_coordinates(anal%xg, nx, dx, xmin)
   call grid_coordinates(anal%yg, ny, dy, ymin)
-! DCD 12/9/10  replaced 0.0 with zmin, which is now set to a default value in the OBAN_PARAMETERS module
   call grid_coordinates(anal%zg, nz, dz, zmin)
 
-!
 !############################################################################
 !
 !     Interpolate the sweep file data to a grid.
 !
 !############################################################################
-!
 
   write(6,*) 'Now interpolating data...'
   write(6,*) 'nx    = ',nx
@@ -448,11 +442,11 @@ PROGRAM OBAN
   allocate(anal%az(nx,ny,nz))
   anal%az(:,:,:) = 0.0
   allocate(anal%el(nx,ny,nz))
-  anal%el(:,:,:) = 0.0
+  anal%el(:,:,:) = sbad
   allocate(anal%height(nx,ny,nz))
   anal%height(:,:,:) = 0.0     
   allocate(anal%time(nx,ny,nz))
-  anal%time(:,:,:) = 0.0
+  anal%time(:,:,:) = sbad
   allocate(anal%count(nx,ny,nz,nfld))
   anal%count(:,:,:,:) = 0
   allocate(anal%name(nfld))
@@ -570,8 +564,6 @@ PROGRAM OBAN
 
       write(6,*) 'Field:  ',vol%sweep%field(nf)%name, ' being thresholded where values of:  ', &
                             vol%sweep%field(1)%name, ' are less than ', post_oban_filter_value(nf)
-!     DCD 1/14/11
-!      DO ns = 1,nswp
       DO k = 1,nz
         DO j = 1,ny
           DO i = 1,nx
@@ -592,8 +584,6 @@ PROGRAM OBAN
 
       write(6,*) 'Field:  ',vol%sweep%field(nf)%name, ' being thresholded where values of:  ', &
                             vol%sweep%field(1)%name, ' are greater than ', post_oban_filter_value(nf)
-!     DCD 1/14/11
-!      DO ns = 1,nswp
       DO k = 1,nz
         DO j = 1,ny
           DO i = 1,nx
@@ -610,41 +600,6 @@ PROGRAM OBAN
 
 !############################################################################
 !
-! Check to see if you need to fill an analyzed field with a value (like dBZ=0)
-!
-!############################################################################
-
-! DCD 1/26/11:  commented out this section
-! filling in NSSL_Oban2D was in grid space
-! filling in merged code (OPAWS2) is in observation space, as it was in OPAWS 1
-
-!  DO nf = 1,nfld
-!    IF( fill_flag(nf) == 1 ) THEN
-!      write(6,*) 'Filling bad values of field:  ',vol%sweep%field(nf)%name, ' with ', fill_value(nf)
-!      DO np = 1,npass
-!!      DCD 1/14/11
-!!       DO ns = 1,nswp
-!       DO k = 1,nz
-
-!        IF(DEBUG) write(6,*) "Number of missing values:  ", count(anal%f(:,:,k,nf,np) .eq. sbad)
-
-!        DO j = 1,ny
-!         DO i = 1,nx
-!          IF( anal%f(i,j,k,nf,np) .eq. sbad ) THEN
-!            anal%f(i,j,k,nf,np) = fill_value(nf)
-!          ENDIF
-!         ENDDO
-!        ENDDO
-
-!        IF(DEBUG) write(6,*) "New # missing values:  ", count(anal%f(:,:,k,nf,np) .eq. sbad)
-
-!       ENDDO
-!      ENDDO
-!    ENDIF
-!  ENDDO
-
-!############################################################################
-!
 !     Output the results.
 !
 !############################################################################
@@ -655,7 +610,7 @@ PROGRAM OBAN
   IF (output_beam_info) THEN
     write(6,*)
     write(6,*) 'Writing beam information to netcdf file...'
-    call write_beam_info(beam_info_file, ncgen_command, nswp, num_beams, beam_info)
+    call write_beam_info(beam_info_file, nswp, num_beams, beam_info)
   ENDIF
   deallocate(beam_info)
   deallocate(num_beams)
@@ -666,7 +621,7 @@ PROGRAM OBAN
   IF (output_netcdf) THEN
     write(6,*)
     write(6,*) 'Outputting data to netCDF file'
-    CALL WRITENETCDF(output_prefix, ncgen_command, anal, ut, vt, int(cyr), int(cmo), int(cda), int(chr), int(cmn), int(cse))
+    CALL WRITENETCDF(output_prefix, anal, ut, vt, int(cyr), int(cmo), int(cda), int(chr), int(cmn), int(cse))
   ENDIF
 
 !
@@ -695,7 +650,6 @@ PROGRAM OBAN
     IF( nswp > MAXLEVELS) THEN
       write(6,*) 'Cannot create vis5d file, too many levels'
     ELSE
-!     DCD 11/24/10
       CALL WRITEV5D(output_prefix, anal, cyr, cmo, cda, chr, cmn, cse)
     ENDIF
   ENDIF
@@ -770,7 +724,7 @@ CONTAINS
     
     write(6,FMT='("READSWEEP IS CALLED")') 
 
-      write(6,FMT='("READSWEEP:  Reading from ",a80)') vol%filename(s)
+      write(6,FMT='("READSWEEP:  Reading from ",a)') trim(vol%filename(s))
 
       DO n = 1,nfld
         
@@ -1142,7 +1096,6 @@ CONTAINS
   SUBROUTINE READFORAY(s)  
     
     integer              :: s                       ! sweep file number
-! DCD 12/8/10  removed variables comptoaz, d, nf, rlatr, and rlonr
     integer              :: n                       ! field number
     integer              :: r                       ! ray number
     integer              :: g                       ! gate number
@@ -1160,7 +1113,7 @@ CONTAINS
 
     write(6,FMT='("READFORAY IS CALLED")') 
 
-      write(6,FMT='("READFORAY:  Reading from ",a80)') vol%filename(s)
+      write(6,FMT='("READFORAY:  Reading from ",a)') trim(vol%filename(s))
 
       DO n = 1,nfld
         
@@ -1377,6 +1330,11 @@ CONTAINS
           write(6,FMT='(A,2x,i6)') 'READFORAY:  Number of good gates ==  0!!  ', good_gates
           write(6,FMT='(A,2x)')    'READFORAY:  Skipping this variable in the sweep file....'
           write(6,*)
+
+! The field in question may still be allocated from the last sweep
+! Check to see if it is.  If so, deallocate it.
+
+          IF( allocated(vol%sweep%field(n)%ob) ) DEALLOCATE(vol%sweep%field(n)%ob)
  
           CYCLE
  
@@ -1473,8 +1431,8 @@ CONTAINS
          vol%sweep%field(n)%number_of_valid_obs = m
          vol%sweep%field(n)%obmax               = datamax
          vol%sweep%field(n)%obmin               = datamin
-         vol%sweep%field(n)%el                  = sum(vol%sweep%field(n)%ob(:)%el) / size(vol%sweep%field(n)%ob(:)%el)
-         vol%sweep%field(n)%time                = sum(vol%sweep%field(n)%ob(:)%time) / size(vol%sweep%field(n)%ob(:)%time)
+         vol%sweep%field(n)%el                  = sum(vol%sweep%field(n)%ob(1:m)%el) / float(m)
+         vol%sweep%field(n)%time                = sum(vol%sweep%field(n)%ob(1:m)%time) / float(m)
          
          write(6,*) "Field:  ", vol%sweep%field(n)%name, " Max: ", datamax, " Min:  ", datamin
          write(6,*) "Number of valid observations:  ",           vol%sweep%field(n)%number_of_valid_obs
@@ -1587,6 +1545,10 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
 
   IF( allocated(fdata%time) ) deallocate(fdata%time)
   allocate(fdata%time(naz))
+
+  fdata%el(:)   = 0.0
+  fdata%az(:)   = 0.0
+  fdata%time(:) = 0
   
 ! get the azimuthal data
 
@@ -1608,8 +1570,6 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
 
   call check ( nf90_inq_dimid(ncid, GATE_dim, g_dimid), message='Getting ngates var_id' )
   call check ( nf90_inquire_dimension(ncid, g_dimid, name, ngates), message='Getting ngates' )
-
-! print *, 'Number of gates:  ', ngates
 
 ! Nyquist velocity
   
@@ -1637,12 +1597,15 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
 
   IF( allocated(field) ) deallocate(field)
   allocate(field(ngates,naz))
+  field(:,:) = 0.0
 
   IF( allocated(fdata%field) ) deallocate(fdata%field)
   allocate(fdata%field(ngates,naz))
+  fdata%field(:,:) = 0.0
 
   IF( allocated(fdata%range) ) deallocate(fdata%range)
   allocate(fdata%range(ngates))
+  fdata%range(:) = 0.0
 
   call check( nf90_inq_varid(ncid, "Cell_Spacing_Method", varid), message='Getting cell_space_method var_id') 
   call check( nf90_get_var(ncid, varid, cell_space_method), message='Getting cell_space_method variable'   )

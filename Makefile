@@ -11,14 +11,14 @@
 
 # netCDF4 libs - you need to fill in the blanks
 #
-NETCDFINC = -I/   /   /netcdf4/include
-NETCDFLIB = -L/   /   /netcdf4/lib -lm -lnetcdf -L/   /    /hdf5/lib -lhdf5_hl -lhdf5 -lz
+NETCDFINC = -I/usr/local/netcdf4-64/include
+NETCDFLIB = -L/user/local/netcdf4-64/lib -lm -lnetcdf -L/   /    /hdf5/lib -lhdf5_hl -lhdf5 -lz
 
 
 # netCDF3 libs - you need to fill in the blanks
 #
-NETCDFINC = -I/   /   /netcdf3/include
-NETCDFLIB = -L/   /   /netcdfs34/lib -lnetcdf 
+NETCDFINC = -I/usr/local/netcdf3-32-gfortran/include
+NETCDFLIB = -L/usr/local/netcdf3-32-gfortran/lib -lnetcdf 
 
 #=====================================================================================================
 # Fortran and C compiler information - various configurations are setup, try and find one close
@@ -30,6 +30,10 @@ NETCDFLIB = -L/   /   /netcdfs34/lib -lnetcdf
 FC   = gfortran -m64 -g -O0 -Wl,-stack_size,10000000 -ffixed-line-length-132 -Wunused -Wuninitialized
 CC   = gcc
 CFLAGS = -m64 -c -g -I. -DLONG32 -DUNDERSCORE -DLITTLE -Wunused -Wuninitialized
+
+FC   = gfortran -m32 -g -O0 -ffixed-line-length-132
+CC   = gcc
+CFLAGS = -m32 -c -g -I. -DLONG32 -DUNDERSCORE -DLITTLE
 
 #=====================================================================================================
 # Leave this stuff alone
@@ -58,7 +62,7 @@ read_dorade.o: read_dorade.c read_dorade.h
 	$(CC) $(CFLAGS) -c read_dorade.c
 
 fileio.o: fileio.f90
-	$(FC) $(OPT) -c fileio.f90
+	$(FC) $(OPT) $(NETCDFINC) -c fileio.f90
 
 util.o: util.f opaws.inc structures.inc
 	$(FC) $(OPT) -c util.f

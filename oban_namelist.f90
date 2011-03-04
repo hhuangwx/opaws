@@ -252,11 +252,10 @@ MODULE OBAN_PARAMETERS
                                                 !   2 == netcdf (FORAY)
 
   integer :: nfld = 0                           ! number of data fields to be gridded
-  integer :: nswp = 0                           ! controls file I/O:  nswp = -1 ==> use all files in directory specified at bottom of input file
-                                                !                     nswp >  0 ==> read nswp # of filenames at bottom of input file
-
-  character(LEN=80) :: ncgen_command = "ncgen"  ! path/executable for local "ncgen" command
-
+  integer :: nswp = 0                           ! controls file I/O:  nswp = -1 ==> use all files in directory specified 
+                                                !                                        at bottom of input file
+                                                !                     nswp >  0 ==> read nswp # of filenames at bottom of 
+                                                !                                        input file
 
   NAMELIST /parameters/                          &
                           nx,                    &
@@ -329,8 +328,7 @@ MODULE OBAN_PARAMETERS
                           allow_extrapolation,   &
                           radar_data_format,     &
                           nfld,                  &
-                          nswp,                  &
-                          ncgen_command
+                          nswp
 
  CONTAINS
 
@@ -407,7 +405,6 @@ MODULE OBAN_PARAMETERS
      CALL DICT_CREATE( "Radar data format",   int=radar_data_format )
      CALL DICT_CREATE( "No. of radar fields", int=nfld )
      CALL DICT_CREATE( "No. of files",        int=nswp )
-     CALL DICT_CREATE( "ncgen command",       str=ncgen_command )
 
    END SUBROUTINE OBAN_PARAMETERS_INIT
 
@@ -430,22 +427,21 @@ MODULE OBAN_FIELDS
 
   implicit none
 
-! DCD 12/6/10 (use maxflds parameter from opaws.inc rather than locally declared parameter)
   include 'opaws.inc'
 
   character(LEN=8) :: fieldnames(maxflds)        ! Names of the variables to read in the sweep/foray files (e.g., VR, DZ)
-  data fieldnames/maxflds*""/
+  data fieldnames /maxflds*""/
 
   integer :: fill_flag(maxflds)                  ! fill missing field values with a specified value? (0=no, 1=yes)
-  data fill_flag/maxflds*0/
+  data fill_flag /maxflds*0/
   real    :: fill_value(maxflds)                 ! replacement value, if fill_flag==1
   data fill_value/maxflds*r_missing/
 
   integer :: unfold_flag(maxflds)                ! locally unfold field? (0=no, 1=yes)
-  data unfold_flag/maxflds*0/
+  data unfold_flag /maxflds*0/
 
   real    :: error(maxflds)                      ! standard deviation of ob errors the DART output
-  data error/maxflds*r_missing/
+  data error /maxflds*r_missing/
                                                  ! These are extra filters for the data.  The thresholding is done on
                                                  ! the first field read in, which is usually DBZ.  If you are not sure
                                                  ! what to use, turn these off.
@@ -459,15 +455,15 @@ MODULE OBAN_FIELDS
   data post_oban_filter_flag/maxflds*0/
   real    :: post_oban_filter_value(maxflds)     ! All fields are set to missing below/above this value 
   data post_oban_filter_value/maxflds*r_missing/ ! Example:
-                                                 !         Threshold Vr on dBZ:  post_oban_filter_flag = -1, Vr=missing for dBZ > 70.
+                                                 !   Threshold Vr on dBZ:  post_oban_filter_flag = -1, Vr=missing for dBZ > 70.
                                                  !
 
   NAMELIST /fields/                              &
+                          error,                 &
                           fieldnames,            &
                           fill_flag,             &
                           fill_value,            &
                           unfold_flag,           &
-                          error,                 &
                           pre_oban_filter_flag,  &
                           pre_oban_filter_value, &
                           post_oban_filter_flag, &
@@ -678,6 +674,7 @@ MODULE NAMELIST_MODULE
       IF ( (fill_flag(f) .eq. 1) .and. (fill_value(f) .eq. r_missing) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'fill_value')
       IF ( (unfold_flag(f) .lt. -1) .or. (unfold_flag(f) .gt. 1) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'unfold_flag')
       IF ( (unfold_flag(f) .eq. 1) .and. (analysis_type .ne. 2) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'unfold_flag')
+            print *, error(f)
       IF (error(f) .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'error')
       IF ( (pre_oban_filter_flag(f) .lt. -1) .or. (pre_oban_filter_flag(f) .gt. 1) )  &
          CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'pre_oban_filter_flag')
