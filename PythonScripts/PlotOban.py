@@ -16,7 +16,7 @@ output_format = "png"
 # ADD the name of the variables you want plotted here.
 #
 ref_variables = ["DBZ", "DZ"]
-vr_variables  = ["VE", "VR", "VEL", "VU"]
+vr_variables  = ["DV", "VE", "VR", "VEL", "VU"]
 
 def create_html(directory,files):
 
@@ -142,6 +142,21 @@ def main(argv=None):
         except:
             print "\n Cannot find variable ", item
 
+    try:
+       print "Shape of reflectivity field:  ", d.shape
+    except UnboundLocalError:
+       print
+       print "**** !!!!ERROR!!!! ****"
+       print
+       print "No valid Reflectivity field found"
+       print "PlotOban looked for the following fields:  ", ref_variables
+       print
+       print "netCDF file has the following variables:  \n" 
+       for item in ncdf_file.variables.keys():  print item 
+       print
+       print "Please add the name of the file's reflectivity field to the list of ref_variables at top of the PlotOban script"
+       print
+       sys.exit(1)
 # Here try and read in radial velocity data
 #
     for item in vr_variables:
@@ -150,6 +165,22 @@ def main(argv=None):
             print "\n ===> Read variable ", item
         except:
             print "\n Cannot find variable ", item
+
+    try:
+       print "Shape of radial velocity field:  ", v.shape
+    except UnboundLocalError:
+       print
+       print "**** !!!!ERROR!!!! ****"
+       print
+       print "No valid Radial Velocity field found"
+       print "PlotOban looked for the following fields:  ", vr_variables
+       print
+       print "netCDF file has the following variables:  \n" 
+       for item in ncdf_file.variables.keys():  print item 
+       print
+       print "Please add the name of the radial velocity field to the list of vr_variables at top of the PlotOban script"
+       print
+       sys.exit(1)
 
 # Here read in other data needed for plotting - note failure is not an option!
 #
