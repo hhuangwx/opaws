@@ -1666,7 +1666,8 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
       fdata%range(n) = fdata%range(n-1) + fdata%range(n)/1000.
     ENDDO
   ELSE
-    fdata%range = (fdata%range + range_to_first_cell)/1000.
+!   fdata%range = (fdata%range + range_to_first_cell)/1000.
+    fdata%range = fdata%range / 1000.
     write(6,*) "WARNING - ARE RANGES CORRECT? 1st/last gates in km", fdata%range(1), fdata%range(ngates)
   ENDIF
 
