@@ -60,7 +60,8 @@
       integer npass                   ! number of analysis passes on data
       integer nfld                    ! number of analysis passes on data
       real, allocatable :: sf(:)      ! scaling factors
-      integer i, j, k, n, s, p
+      integer n
+!      integer i, j, k, s, p
       integer ls                      ! string length
       character(len=150) filename     ! output netcdf filename
       
@@ -145,31 +146,31 @@
 
 !---- variable declarations
 
-      integer bad_data_flag
-      real  grid_latitude
-      real  grid_longitude
-      real  grid_altitude
-      real  radar_latitude
-      real  radar_longitude
-      real  radar_altitude
-      real  x_min
-      real  y_min
-      real  x_max
-      real  y_max
-      real  x_spacing
-      real  y_spacing
-      real  x(size(anal%xg))
-      real  y(size(anal%yg))
-      real  z(size(anal%zg))
-      real  el(size(anal%zg))
-      real  z_spacing
-      real  u_translation
-      real  v_translation
+!      integer bad_data_flag
+!      real  grid_latitude
+!      real  grid_longitude
+!      real  grid_altitude
+!      real  radar_latitude
+!      real  radar_longitude
+!      real  radar_altitude
+!      real  x_min
+!      real  y_min
+!      real  x_max
+!      real  y_max
+!      real  x_spacing
+!      real  y_spacing
+!      real  x(size(anal%xg))
+!      real  y(size(anal%yg))
+!      real  z(size(anal%zg))
+!      real  el(size(anal%zg))
+!      real  z_spacing
+!      real  u_translation
+!      real  v_translation
 
 !---- attribute vectors
 
-      integer textval(1)
-      double precision doubleval(1)
+!      integer textval(1)
+!      double precision doubleval(1)
 
 !---- strings
 
@@ -1233,7 +1234,8 @@ END SUBROUTINE WRITENETCDF
       character(len=20), allocatable :: stat_names(:)    ! names of statistic fields
       real, allocatable :: stats(:,:,:,:)                ! statistics as a function of space, elevation angle, and statistic type
       integer stat_index                                 ! index of specified statistic type
-      integer i, j, k, n
+!      integer i, j
+      integer k, n
 
 
 !     Read grid dimensions and check for agreement with expected values.
@@ -1836,8 +1838,8 @@ END SUBROUTINE WRITENETCDF
 ! netCDF id
       integer  ncid
 ! dimension ids
-      integer  nswp_dim
-      integer  maxrays_dim
+      integer  nswp_dim_id
+      integer  maxrays_dim_id
       
 ! variable ids
       integer  num_beams_id
@@ -1867,29 +1869,30 @@ END SUBROUTINE WRITENETCDF
                                message='Error opening file')
 
 ! define dimensions
-      call check( nf90_def_dim(ncid, 'nswp', nswp, nswp_dim), &
+      call check( nf90_def_dim(ncid, 'nswp', nswp, nswp_dim_id), &
                                message='Error defining nswp dimension')
       
-      call check( nf90_def_dim(ncid, 'maxrays', maxrays, maxrays_dim ), &
-                               message='Error defining nswp dimension')
+      call check( nf90_def_dim(ncid, 'maxrays', maxrays, maxrays_dim_id), &
+                               message='Error defining maxrays dimension')
  
 ! define variables
-      call check( nf90_def_var(ncid, 'num_beams', NF90_INT, num_beams_id), &
+      num_beams_dims(1) = nswp_dim_id
+      call check( nf90_def_var(ncid, 'num_beams', NF90_INT, num_beams_dims, num_beams_id), &
                                message='Error defining num_beams variable')
 
-      time_dims(2) = nswp_dim
-      time_dims(1) = maxrays_dim
-      call check( nf90_def_var(ncid, 'time', NF90_REAL, time_id), &
+      time_dims(2) = nswp_dim_id
+      time_dims(1) = maxrays_dim_id
+      call check( nf90_def_var(ncid, 'time', NF90_REAL, time_dims, time_id), &
                                message='Error defining num_beams variable')
 
-      az_dims(2) = nswp_dim
-      az_dims(1) = maxrays_dim
-      call check( nf90_def_var(ncid, 'az', NF90_REAL, az_id), &
+      az_dims(2) = nswp_dim_id
+      az_dims(1) = maxrays_dim_id
+      call check( nf90_def_var(ncid, 'az', NF90_REAL, az_dims, az_id), &
                                message='Error defining azimuth variable')
 
-      el_dims(2) = nswp_dim
-      el_dims(1) = maxrays_dim
-      call check( nf90_def_var(ncid, 'el', NF90_REAL,  el_id), &
+      el_dims(2) = nswp_dim_id
+      el_dims(1) = maxrays_dim_id
+      call check( nf90_def_var(ncid, 'el', NF90_REAL, el_dims, el_id), &
                                message='Error defining elevation variable')
      
 ! assign attributes
@@ -1925,7 +1928,7 @@ END SUBROUTINE WRITENETCDF
       DO i = 1,nswp
         DO j = 1,maxrays
             time(j,i) = beam_info(j,i,1)
-            az(j,i)   = beam_info(j,1,2)
+            az(j,i)   = beam_info(j,i,2)
             el(j,i)   = beam_info(j,i,3)
         ENDDO
       ENDDO
