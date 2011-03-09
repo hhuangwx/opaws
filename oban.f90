@@ -436,15 +436,14 @@ PROGRAM OBAN
   write(6,*) 'vsp0  = ',vsp0
   write(6,*) 'npass = ',npass
 
-! DCD 1/28/11  would it be better to initialize some of these arrays to sbad rather than 0.0?
   allocate(anal%f(nx,ny,nz,nfld,npass))
   anal%f(:,:,:,:,:) = 0.0
   allocate(anal%az(nx,ny,nz))
-  anal%az(:,:,:) = 0.0
+  anal%az(:,:,:) = sbad       ! DCD 3/9/11 replaced 0.0 with sbad
   allocate(anal%el(nx,ny,nz))
   anal%el(:,:,:) = sbad
   allocate(anal%height(nx,ny,nz))
-  anal%height(:,:,:) = 0.0     
+  anal%height(:,:,:) = sbad   ! DCD 3/9/11 replaced 0.0 with sbad     
   allocate(anal%time(nx,ny,nz))
   anal%time(:,:,:) = sbad
   allocate(anal%count(nx,ny,nz,nfld))
