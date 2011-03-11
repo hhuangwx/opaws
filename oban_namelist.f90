@@ -631,12 +631,15 @@ MODULE NAMELIST_MODULE
 
     IF ( nx .eq. i_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'nx')
     IF ( ny .eq. i_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'ny')
+    IF ( (nz .eq. i_missing) .and. (analysis_type .eq. 1) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'nz')
 
     IF ( xmin .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'xmin')
     IF ( ymin .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'ymin')
+    IF ( (zmin .eq. r_missing) .and. (analysis_type .eq. 1) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'zmin')
 
     IF ( dx .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'dx')
     IF ( dy .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'dy')
+    IF ( (dz .eq. r_missing) .and. (analysis_type .eq. 1) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'dz')
 
     IF ( glon .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'glon')
     IF ( glat .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'glat')
