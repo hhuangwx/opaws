@@ -38,7 +38,7 @@
 !
 !############################################################################
 
-    SUBROUTINE WRITENETCDF(prefix, anal, ut, vt, yr, mo, da, hr, mn, se)
+    SUBROUTINE WRITENETCDF(prefix, analysis_type, anal, ut, vt, yr, mo, da, hr, mn, se)
 
       USE DTYPES_module
       USE netcdf
@@ -49,6 +49,9 @@
 !---- input parameters
 
       character(len=*) prefix       ! prefix file name
+      integer analysis_type         ! Type of analysis
+                                    !   1 == 3D Cartesian
+                                    !   2 == 2D sweep by sweep
       TYPE(ANALYSISGRID) anal
       real ut, vt                     ! storm translation velocity (m/s)
       integer yr, mo, da              ! year, month, and day
@@ -100,6 +103,7 @@
 
 !---- variable IDs
 
+      integer analysis_type_id
       integer start_date_id
       integer end_date_id
       integer start_time_id
@@ -220,6 +224,8 @@
 
 !---- define variables
 
+      call check(nf90_def_var(ncid, 'analysis_type', nf90_int, analysis_type_id));
+
       start_date_dims(1) = date_string_dim
       call check(nf90_def_var(ncid, 'start_date', nf90_char, start_date_dims, start_date_id));
 
@@ -303,6 +309,8 @@
 
 !---- assign variable attributes
 
+      call check(nf90_put_att(ncid, analysis_type_id, 'value', 'Analysis type (1=3D, 2=2D)'))
+
       call check(nf90_put_att(ncid, grid_latitude_id, 'value', 'Grid origin latitude'))
       call check(nf90_put_att(ncid, grid_latitude_id, 'units', 'deg'))
 
@@ -369,6 +377,7 @@
       write(start_time, '(I2.2, A, I2.2, A, I2.2)') hr, ':', mn, ':', se
       write(end_time, '(I2.2, A, I2.2, A, I2.2)') hr, ':', mn, ':', se
 
+      call check( nf90_put_var(ncid, analysis_type_id, analysis_type) )
       call check( nf90_put_var(ncid, start_date_id, start_date) )
       call check( nf90_put_var(ncid, end_date_id, end_date) )
       call check( nf90_put_var(ncid, start_time_id, start_time) )
@@ -1864,6 +1873,7 @@ END SUBROUTINE WRITENETCDF
       real  az(maxrays, nswp)
       real  el(maxrays, nswp)
             
+
 ! enter define mode
       call check( nf90_create('beam_info.nc', NF90_CLOBBER, ncid), &                               
                                message='Error opening file')
@@ -1874,7 +1884,7 @@ END SUBROUTINE WRITENETCDF
       
       call check( nf90_def_dim(ncid, 'maxrays', maxrays, maxrays_dim_id), &
                                message='Error defining maxrays dimension')
- 
+
 ! define variables
       num_beams_dims(1) = nswp_dim_id
       call check( nf90_def_var(ncid, 'num_beams', NF90_INT, num_beams_dims, num_beams_id), &
@@ -1894,7 +1904,7 @@ END SUBROUTINE WRITENETCDF
       el_dims(1) = maxrays_dim_id
       call check( nf90_def_var(ncid, 'el', NF90_REAL, el_dims, el_id), &
                                message='Error defining elevation variable')
-     
+
 ! assign attributes
       call check( nf90_put_att(ncid, num_beams_id, 'description', 'number of beams in sweep'), &
                                message='Error writing num_beams description attribute')
@@ -1923,7 +1933,7 @@ END SUBROUTINE WRITENETCDF
             
 ! store num_beams
       call check( nf90_put_var(ncid, num_beams_id, num_beams), message='Error writing num_beams variable')
-      
+
 ! store time
       DO i = 1,nswp
         DO j = 1,maxrays
@@ -1938,7 +1948,7 @@ END SUBROUTINE WRITENETCDF
       call check( nf90_put_var(ncid, el_id, el), message='Error writing elevation variable')
       
       call check( NF90_CLOSE(ncid), message='Error closing beaminfo file: ')
-      
+
     RETURN
     END SUBROUTINE WRITE_BEAM_INFO
       
@@ -1961,4 +1971,270 @@ END SUBROUTINE WRITENETCDF
     RETURN
     END SUBROUTINE CHECK  
 
+
+!############################################################################
+!
+!     ##################################################################
+!     ##################################################################
+!     ######                                                      ######
+!     ######                SUBROUTINE READNETCDF                 ######
+!     ######                                                      ######
+!     ##################################################################
+!     ##################################################################
+!
+!
+!############################################################################
+!
+!     PURPOSE:
+!
+!     This subroutine reads gridded fields from a netcdf file (in the format
+!     produced by oban or dualdop).
+!
+!############################################################################
+
+      subroutine readnetcdf(ncfile, nx, ny, nz, nfld, fname, f,   &
+                             glon, glat, galt,                    &
+                             cyr, cmo, cda, chr, cmn, cse,        &
+                             dx, dy, dz,                          &
+                             xmin, ymin, zmin, ut, vt)
+
+      implicit none
+
+      include 'opaws.inc'
+      include 'netcdf.inc'
+
+!---- input parameters
+
+      character(len=100) ncfile    ! netcdf file name
+      integer nx, ny, nz           ! no. of grid points in x, y, and z directions
+      integer nfld                 ! number of data fields needed
+      character(len=8) fname(nfld) ! field names
+
+!---- returned variables
+
+      real f(nx,ny,nz,nfld)        ! data fields
+      real glat, glon              ! latitude and longitude of grid origin (deg)
+      real galt                    ! altitude of grid origin (km MSL)
+      integer cyr,cmo,cda          ! central date
+      integer chr,cmn,cse          ! central time
+      real dx, dy, dz              ! grid spacing in x, y, and z directions (km)
+      real xmin, ymin, zmin        ! coordinates of lower southwest corner
+                                   !   of grid, relative to origin (km)
+      real ut, vt                  ! translation velocity (m/s)
+
+!---- local variables
+
+      integer ncid, status, id
+      character(len=10) date
+      character(len=8) time
+      integer n
+      integer npass
+      real z(nz)
+      real, allocatable :: in5d(:,:,:,:,:)
+
+
+!     Open netcdf file.
+
+      status = NF_OPEN(ncfile, NF_NOWRITE, ncid)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem opening file: ', NF_STRERROR(status), ncid
+        stop
+      endif
+
+!     Read dimensions.
+      status = NF_INQ_DIMID(ncid, 'pass', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for pass: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_INQ_DIMLEN(ncid, id, npass)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining pass: ', NF_STRERROR(status)
+        stop
+      endif
+
+!     Read scalar variables.
+
+      status = NF_INQ_VARID(ncid, 'grid_latitude', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for glat: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, glat)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining glat: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'grid_longitude', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for glon: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, glon)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining glon: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'grid_altitude', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for galt: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, galt)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining galt: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'start_date', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for start_date: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_TEXT(ncid, id, date)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining start_date: ', NF_STRERROR(status)
+        stop
+      endif
+      read(date(7:10),*) cyr
+      read(date(1:2),*) cmo
+      read(date(4:5),*) cda
+
+      status = NF_INQ_VARID(ncid, 'start_time', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for start_time: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_TEXT(ncid, id, time)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining start_time: ', NF_STRERROR(status)
+        stop
+      endif
+      read(time(1:2),*) chr
+      read(time(4:5),*) cmn
+      read(time(7:8),*) cse
+
+      status = NF_INQ_VARID(ncid, 'x_spacing', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for dx: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, dx)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining dx: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'y_spacing', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for dy: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, dy)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining dy: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'z_spacing', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for dz: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, dz)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining dz: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'x_min', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for xmin: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, xmin)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining xmin: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'y_min', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for ymin: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, ymin)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining ymin: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'z', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for z: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, z)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining z: ', NF_STRERROR(status)
+        stop
+      endif
+      zmin = z(1)
+
+      status = NF_INQ_VARID(ncid, 'u_translation', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for ut: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, ut)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining ut: ', NF_STRERROR(status)
+        stop
+      endif
+
+      status = NF_INQ_VARID(ncid, 'v_translation', id)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining id for vt: ', NF_STRERROR(status)
+        stop
+      endif
+      status = NF_GET_VAR_REAL(ncid, id, vt)
+      if (status .ne. NF_NOERR) then
+        write(*,*) 'Problem obtaining vt: ', NF_STRERROR(status)
+        stop
+      endif
+
+!     Read 3D arrays.
+
+
+      allocate(in5d(nx,ny,nz,npass,1))
+
+      do n=1, nfld
+        status = NF_INQ_VARID(ncid, fname(n), id)
+        if (status .ne. NF_NOERR) then
+          write(*,*) 'Problem obtaining id for ', fname(n), ': ', NF_STRERROR(status)
+          stop
+        endif
+        status = NF_GET_VAR_REAL(ncid, id, in5d)
+        f(:,:,:,n) = in5d(:,:,:,npass,1)
+        if (status .ne. NF_NOERR) then
+          write(*,*) 'Problem obtaining ', fname(n), ': ', NF_STRERROR(status)
+          stop
+        endif
+
+      enddo
+
+      deallocate(in5d)
+
+!     Close  netcdf file
+
+      status=NF_CLOSE(ncid)
+      if (status.ne.NF_NOERR) then
+        write(*,*) 'Error closing file: ', NF_STRERROR(status)
+      endif
+
+
+      return
+      end
 
