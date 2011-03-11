@@ -620,7 +620,7 @@ PROGRAM OBAN
   IF (output_netcdf) THEN
     write(6,*)
     write(6,*) 'Outputting data to netCDF file'
-    CALL WRITENETCDF(output_prefix, anal, ut, vt, int(cyr), int(cmo), int(cda), int(chr), int(cmn), int(cse))
+    CALL WRITENETCDF(output_prefix, analysis_type, anal, ut, vt, int(cyr), int(cmo), int(cda), int(chr), int(cmn), int(cse))
   ENDIF
 
 !
