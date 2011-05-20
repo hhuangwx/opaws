@@ -14,6 +14,10 @@
 /* -- added a new function read_csfd                                                    */
 /* -- added offset_fac to the calculations for RDAT                                     */
 
+/* modified 5/20/11 by David Dowell:
+/* -- directed sweepread to return if the identifier is not recognized                  */
+/* -- modified read_sh_arr so that bad / missing data are set to -32768.0               */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,7 +81,7 @@ void sweepread_(char swp_fname[],struct vold_info *vptr,
          printf("sweep file read error..can't read identifier\n");
          exit(-1);
       }
-      /*printf ("reading '%s'\n",identifier);/*
+      /* printf ("reading '%s'\n",identifier); */
 
       /* READ THE DESCRIPTOR LENGTH */
 #ifdef LONG32
@@ -85,6 +89,7 @@ void sweepread_(char swp_fname[],struct vold_info *vptr,
 #else
       desc_len=read_long(fp);
 #endif
+      /* printf ("desc_len = %d\n",desc_len); */
 
       if ( (strncmp(identifier,"VOLD",IDENT_LEN)) == 0) {
          /* READ THE VOLUME DESCRIPTOR */
@@ -201,14 +206,36 @@ void sweepread_(char swp_fname[],struct vold_info *vptr,
       } else if ( (strncmp(identifier,"NULL",IDENT_LEN)) == 0) {
          break;
 
-      } else {
+      } else if (    ((strncmp(identifier,"SSWB",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"COMM",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"QDAT",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"XSTF",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"RKTB",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"FRAD",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"FRIB",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"LIDR",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"FLIB",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"SITU",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"ISIT",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"INDF",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"MINI",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"NDDS",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"TIME",IDENT_LEN)) == 0)
+                  || ((strncmp(identifier,"SAVE",IDENT_LEN)) == 0) ) {		  
+		  
 #ifdef LONG32
           skip_bytes(fp,desc_len-(IDENT_LEN+sizeof(int)));
 #else
           skip_bytes(fp,desc_len-(IDENT_LEN+sizeof(long)));
 #endif
-      } /* endif */
 
+      } else {
+		  
+ 	     printf ("*** warning:  unable to read entire sweep file\n");
+		 break;
+
+      } /* endif */
+	   
    } /* endwhile */
 
    fclose(fp);
@@ -322,10 +349,15 @@ void read_parm(FILE *fp,struct parm_info *pptr,int desc_len)
 
    } /* endif */
 
-   pptr->parm_name[PARM_NAME_LEN-1]='\0';
-   pptr->parm_desc[PARM_DESC_LEN-1]='\0';
-   pptr->parm_unit[PARM_UNIT_LEN-1]='\0';
+    pptr->parm_name[PARM_NAME_LEN-1]='\0';
+    pptr->parm_desc[PARM_DESC_LEN-1]='\0';
+    pptr->parm_unit[PARM_UNIT_LEN-1]='\0';
 
+    /* printf("field name:  %s\n",pptr->parm_name); */
+    /* printf("field desc:  %s\n",pptr->parm_desc); */
+    /* printf("field unit:  %s\n",pptr->parm_unit); */
+    /* printf("\n");                                */
+    
 }
 /***************************************************/
 void read_celv(FILE *fp,struct celv_info *cptr,int desc_len)
@@ -491,6 +523,8 @@ void read_rdat(FILE *fp,char fld_name[],int fld_num,
          != PARM_NAME_LEN)
       {printf("sweep file read error..can't read parameter name\n");}
 
+   /* printf("field name:  %s\n",tempname); */
+
    /* added 11/10/10 by David Dowell */
    /* CALCULATE LENGTH OF INPUTNAME AND INITIALIZE IT */
    for (i_strsize=0;i_strsize<PARM_NAME_LEN;i_strsize++) {
@@ -588,7 +622,15 @@ void read_sh_arr(FILE *fp,int arrsize,int beam_count,
       if (arr_uncom[i] != baddata_flag) {
          dptr->data[i]=((float)arr_uncom[i] - offset_fac) / scale_fac;
       } else {
-         dptr->data[i]=(float)arr_uncom[i];
+
+         /* printf("baddata_flag, data = %d, %f\n", baddata_flag, dptr->data[i]); */
+
+         /* David Dowell 5/20/11                                                               */
+         /* Use the following hard-coded value for bad/missing data rather than the bad data   */
+         /* flag specified in the dorade sweep file.  The value below should be the same as    */
+         /* sbad in opaws.inc.                                                                 */
+         dptr->data[i]=-32768.0;
+         /* dptr->data[i]=(float)arr_uncom[i]; */
       }
    }
 
