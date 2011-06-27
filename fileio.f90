@@ -182,7 +182,7 @@
       character (len=10) end_date
       character (len=8) start_time
       character (len=8) end_time
-      character (len=8) :: fieldname(6)
+      character (len=8), allocatable :: fieldname(:)
 
 !---- get dimension sizes                                                                                                                                                                                                   
       nx    = size(anal%xg)
@@ -198,6 +198,7 @@
       write(6,FMT='(" WRITENETCDF -> INPUT DIMS NPASS: ", i3)') npass
 
       allocate(sf(nfld))
+      allocate(fieldname(nfld+4))
       sf(:) = 1.0
 
 !---- write netcdf filename and open file
@@ -415,6 +416,7 @@
       call check( nf90_close(ncid) )
 
     deallocate(sf)
+    deallocate(fieldname)
 
     RETURN
 
