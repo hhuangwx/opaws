@@ -20,7 +20,8 @@
       parameter (sbad=-32768., clutter_flag=-32767.)
       integer maxflds        ! maximum no. of fields in sweep file
       integer maxrays        ! maximum no. of rays in sweep file
-      parameter (maxflds=20, maxrays=3000)
+      parameter (maxflds=50) ! IMPORTANT NOTE:  This value should be the same as MAX_NUM_PARMS in read_dorade.h
+      parameter (maxrays=3000)
       real pi                ! pi
       parameter (pi=3.14159265)
       real dtor              ! conversion from degrees to radians
