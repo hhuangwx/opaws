@@ -57,6 +57,16 @@ BUILD instructions
 
 ================================================================================
 
+changes for version 2.0.1 of OPAWS (10 August 2011) - DCD
+---------------------------------------------------------------------------
+* Added a new program x.clutter_stats, which computes statistics indicative of
+  ground clutter (e.g., velocity close to zero, reflectivity above a threshold) in observation space.
+  - note:  currently implemented for dorade sweep files only (not foray netcdf)
+* Removed old subroutines that computed statistics in grid space ("ppi stats").
+* Renamed oban_namelist.f90 to opaws_namelists.f90 and added namelist for x.clutter_stats.
+* Added code to oban.f90 for applying clutter mask based on results from x.clutter_stats.
+  - note:  currently implemented for dorade sweep files only (not foray netcdf)
+
 changes for version 2.0_beta2 of OPAWS (4 March 2011) - LJW
 ---------------------------------------------------------------------------
 * Fixed bugs in FORAY processing when no good data is present
