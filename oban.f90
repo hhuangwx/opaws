@@ -67,6 +67,9 @@
 !     Incorporation of functionality from OPAWS1:
 !                                                          David Dowell, Jan 2011
 !
+!     Removed grid-space clutter masking.  Added observation-space clutter masking.
+!                                                          David Dowell, July 2011
+!
 !############################################################################
 
 !
@@ -88,17 +91,30 @@ PROGRAM OBAN
   implicit none
 
   include 'v5df.h'
+  include 'structures.inc'
 
-  character(LEN=128), parameter :: version = "Version 2.0 beta2:  Updated 05 March, 2011 [LJW]"
+  character(LEN=128), parameter :: version = "Version 2.0.1:  Updated 8 August 2011 [DCD]"
 
-  integer i, j, k, ns, np, nf                ! loop variables
-  integer ls                                 ! length of input string
-  integer dbz_index                          ! index of reflectivity data in analysis array
+  integer i, j, k, ns, np, nf                 ! loop variables
+  integer ls                                  ! length of input string
 
-  logical, allocatable :: threshold(:,:)     ! Moved threshold array to calling program (from READSWEEP), so that subsequent calls to READSWEEP
-                                             ! can access its contents
+  logical, allocatable :: threshold(:,:)      ! Moved threshold array to calling program (from READSWEEP), so that subsequent calls to READSWEEP
+                                              ! can access its contents
 
-  TYPE(SWEEP_INFORMATION) :: sweep_info      ! information about individual sweeps, such as Nyquist velocity (m/s) for each field
+  TYPE(SWEEP_INFORMATION) :: sweep_info       ! information about individual sweeps, such as Nyquist velocity (m/s) for each field
+
+  logical, allocatable :: cm_clutter(:,:,:)   ! .true. if (range, azimuth, elevation) bin has been determined to be contaminated by ground clutter
+  integer cm_nr                               ! number of range bins for clutter mask
+  real, allocatable :: cm_r(:)                ! range coordinates of bin edges (km)
+  integer cm_na                               ! number of azimuth-angle bins for clutter mask
+  real, allocatable :: cm_a(:)                ! azimuth angle coordinates of bin edges (deg)
+  integer cm_ne                               ! number of elevation-angle bins for clutter mask
+  real, allocatable :: cm_e(:)                ! elevation angle coordinates of bin edges (deg)
+  real, allocatable :: cm_mean_refl(:,:,:)    ! mean reflectivity (dBZ) for (range, azimuth, elevation) bin
+  type(rdat_info), dimension(maxrays) :: refl ! raw reflectivity scan, used in clutter masking
+!  character(len=100) stat_file
+!  character(len=20) stat_name
+!  real, allocatable :: stats(:,:,:,:)
 
 ! DCD 11/26/10 adding these for possible later code updates
   real, allocatable :: min_threshold(:)      ! value below which input observations are set to missing
@@ -330,19 +346,17 @@ PROGRAM OBAN
 
   write(6,*)
   write(6,*) 'Parameters for clutter mask:'
-  write(6,*) 'use_clutter_mask = ', use_clutter_mask
-  if (use_clutter_mask) then
-    write(6,*) 'cm_min_refl_avail = ', cm_min_refl_avail
-    write(6,*) 'cm_min_refl = ', cm_min_refl
-    write(6,*) 'cm_max_refl_sd = ', cm_max_refl_sd
-    write(6,*) 'cm_refl_exceedance = ', cm_refl_exceedance
-    write(6,*) 'cm_min_vel_sd = ', cm_min_vel_sd
-    write(6,*) 'cm_max_vel = ', cm_max_vel
-    write(6,*) 'cm_max_vel_sd = ', cm_max_vel_sd
-    write(6,*) 'cm_ncfile = ', cm_ncfile
+  write(6,*) 'cm_use_clutter_mask = ', cm_use_clutter_mask
+  if (cm_use_clutter_mask) then
+    write(6,*) 'cm_min_fixed_clutter_freq = ', cm_min_fixed_clutter_freq
+    write(6,*) 'cm_min_moving_clutter_freq = ', cm_min_moving_clutter_freq
+    write(6,*) 'cm_halo = ', cm_halo
+    write(6,*) 'cm_use_refl_test = ', cm_use_refl_test
     write(6,*) 'cm_refl_fname = ', cm_refl_fname
-    write(6,*) 'cm_refl_fname_ppi = ', cm_refl_fname_ppi
-    write(6,*) 'cm_vel_fname_ppi = ', cm_vel_fname_ppi
+    write(6,*) 'cm_refl_exceedance = ', cm_refl_exceedance
+    write(6,*) 'cm_min_obs = ', cm_min_obs
+    write(6,*) 'cm_min_sweeps = ', cm_min_sweeps
+    write(6,*) 'cm_ncfile = ', cm_ncfile
   endif
 
   write(6,*)
@@ -456,12 +470,53 @@ PROGRAM OBAN
   anal%sec(:) = 0
   allocate(anal%error(nfld))
   anal%error(1:nfld) = error(1:nfld)
+
+!############################################################################
+!
+! Initialize a clutter mask, if requested.
+!
+!############################################################################
+
+  IF (cm_use_clutter_mask) THEN
+    CALL READ_NETCDF_CLUTTER_STAT_DIMS(cm_ncfile, cm_nr, cm_na, cm_ne)
+    allocate(cm_clutter(cm_nr,cm_na,cm_ne))
+    allocate(cm_r(cm_nr+1))
+    allocate(cm_a(cm_na+1))
+    allocate(cm_e(cm_ne+1))
+    allocate(cm_mean_refl(cm_nr,cm_na,cm_ne))
+    CALL CLUTTER_MASK(cm_nr, cm_na, cm_ne, cm_clutter, cm_r, cm_a, cm_e, cm_mean_refl,   &
+                      cm_min_fixed_clutter_freq, cm_min_moving_clutter_freq,          &
+                      cm_halo, cm_min_obs, cm_min_sweeps, cm_ncfile)
+
+!    allocate(stats(cm_nr,cm_na,cm_ne,1))
+!    do k=1, cm_ne
+!      do j=1, cm_na
+!        do i=1, cm_nr
+!          if (cm_clutter(i,j,k)) then
+!            stats(i,j,k,1) = 1.0
+!          else
+!            stats(i,j,k,1) = 0.0
+!          endif
+!        enddo
+!      enddo
+!    enddo
+!    stat_file = 'clutter_mask.nc'
+!    stat_name = 'clutter_mask'
+!    call WRITE_NETCDF_CLUTTER_STATS(stat_file, cm_nr, cm_r, cm_na, cm_a, cm_ne, cm_e, 1, stat_name, stats)
+!    deallocate(stats)
+
+  ENDIF
   
 !############################################################################
 !
 ! Do the multi-pass objective analysis, reading in sweep data during each pass.
 !
 !############################################################################
+
+  ! initialize array that will store previous reflectivity sweep during clutter masking
+  DO i=1, maxrays
+    refl(i)%data(:) = sbad
+  ENDDO
 
   DO np = 1,npass
     CALL OBAN_INIT(nfld, anal, allow_extrapolation)
@@ -515,38 +570,6 @@ PROGRAM OBAN
       ENDDO
     ENDDO
   ENDIF
-
-
-
-!############################################################################
-!
-!     Eliminate observations based on the clutter mask.
-!
-!     analysis_type must be 2 (2D sweep-by-sweep)
-!
-!############################################################################
-
-  IF (use_clutter_mask) THEN
-
-    dbz_index = 0
-    DO nf = 1, nfld
-      IF ( index(anal%name(nf),cm_refl_fname) .ne. 0) dbz_index=nf
-    ENDDO
-    IF (dbz_index.eq.0) THEN
-      write(6,*) 'ANALYSIS REFLECTIVITY FIELD NOT FOUND FOR CLUTTER MASK'
-      stop
-    ELSE
-      write(6,*) 'analysis reflectivity field for clutter mask:  ', dbz_index, anal%name(dbz_index)
-    ENDIF
-
-    call clutter_mask(cm_ncfile, cm_refl_fname_ppi, cm_vel_fname_ppi,                       &
-                      cm_min_refl_avail, cm_min_refl, cm_max_refl_sd, cm_refl_exceedance,   &
-                      cm_min_vel_sd, cm_max_vel, cm_max_vel_sd,                             &
-                      glon, glat, galt, nx, ny, nz, dx, dy, xmin, ymin,                     &
-                      nfld, npass, anal%el, anal%f(1,1,1,dbz_index,npass), anal%f)
-  ENDIF
-
-
 
 !############################################################################
 !
@@ -666,6 +689,13 @@ PROGRAM OBAN
   deallocate(anal%count)
   deallocate(anal%name)
   deallocate(sweep_info%Nyquist_vel)
+  IF (cm_use_clutter_mask) THEN
+    deallocate(cm_clutter)
+    deallocate(cm_r)
+    deallocate(cm_a)
+    deallocate(cm_e)
+    deallocate(cm_mean_refl)
+  ENDIF
 
   write(6,*)
   write(6,*) 'PROGRAM OBAN IS FINISHED.'
@@ -709,8 +739,11 @@ CONTAINS
     logical, allocatable :: threshold(:,:)
     integer year, month, day, hour, minute, second
     integer(kind=4) cjd             ! central julian day
+    integer find_index              ! function used by this subroutine
+    integer ri, ai, ei              ! range, azimuth, and elevation indices
+    logical is_clutter
 
-    
+    ! dorade data structures    
     type(vold_info)                     :: vold
     type(radd_info)                     :: radd
     type(celv_info)                     :: celv
@@ -720,10 +753,30 @@ CONTAINS
     type(ryib_info), dimension(maxrays) :: ryib
     type(asib_info), dimension(maxrays) :: asib
     type(rdat_info), dimension(maxrays) :: rdat
-    
-    write(6,FMT='("READSWEEP IS CALLED")') 
+
+    ! previous reflectivity sweep, used during clutter masking
+    type(rdat_info), dimension(maxrays) :: prev_refl    
+
+
+      write(6,FMT='("READSWEEP IS CALLED")') 
 
       write(6,FMT='("READSWEEP:  Reading from ",a)') trim(vol%filename(s))
+
+      IF ( cm_use_clutter_mask .and. cm_use_refl_test ) THEN
+        DO r=1, maxrays
+          prev_refl(r)%data(:) = refl(r)%data(:)
+        ENDDO
+        write(6,FMT='("READING REFLECTIVITY FIELD FOR CLUTTER MASKING:  ",a8)') cm_refl_fname
+        call sweepread(vol%filename(s),vold,radd,celv,cfac,parm,swib,ryib,asib,refl,cm_refl_fname)
+        call check_sweep_size(radd%num_param_desc, swib%num_rays)
+!       For super-res 88D data, use the previous sweep if this is a second reflectivity sweep at a duplicate elevation angle.
+        IF ( (cm_refl_fname .eq. 'REF') .and. (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
+          write(6,*) 'USING REFLECTIVITY DATA FROM PREVIOUS SWEEP'
+          DO r=1, maxrays
+            refl(r)%data(:) = prev_refl(r)%data(:)
+          ENDDO
+        ENDIF
+      ENDIF
 
       DO n = 1,nfld
         
@@ -807,6 +860,48 @@ CONTAINS
           CYCLE
 
         ENDIF
+
+! Delete ground clutter.
+ 
+        IF ( cm_use_clutter_mask ) THEN
+
+          DO g = 1,celv%total_gates
+
+            range = rangekm_to_gate(celv, g)
+            ri = find_index(range, cm_r, cm_nr+1)
+
+            IF ( (ri.ge.1) .and. (ri.le.cm_nr) ) THEN
+
+              DO r = 1,swib%num_rays
+
+                IF (rdat(r)%data(g) .ne. sbad) THEN
+
+                  is_clutter = .false.
+
+                  ai = find_index(ryib(r)%azimuth,   cm_a, cm_na+1)
+                  ei = find_index(ryib(r)%elevation, cm_e, cm_ne+1)
+
+                  IF ( (ai.ge.1) .and. (ai.le.cm_na) .and. (ei.ge.1) .and. (ei.le.cm_ne) ) THEN
+                    is_clutter = cm_clutter(ri,ai,ei)
+                    IF ( cm_use_refl_test .and.                     &
+                         (cm_mean_refl(ri,ai,ei) .ne. sbad) .and.   &
+                         (refl(r)%data(g) .ne. sbad) .and.          &
+                         (refl(r)%data(g) .ge. (cm_mean_refl(ri,ai,ei)+cm_refl_exceedance)) ) THEN
+                      is_clutter = .false.
+                    ENDIF
+                  ENDIF
+
+                  IF (is_clutter) rdat(r)%data(g) = sbad
+
+                ENDIF
+
+              ENDDO
+
+            ENDIF      ! IF ( (ri.ge.1) .and. (ri.le.cm_nr) )
+
+          ENDDO      ! DO g = 1,celv%total_gates
+
+        ENDIF      ! IF ( cm_use_clutter_mask )
 
 ! DCD 1/26/11
 ! Fill missing data in observation space.
@@ -1110,9 +1205,14 @@ CONTAINS
 
     TYPE(FORAY_DATA) :: fdata
 
-    write(6,FMT='("READFORAY IS CALLED")') 
+      write(6,FMT='("READFORAY IS CALLED")') 
 
       write(6,FMT='("READFORAY:  Reading from ",a)') trim(vol%filename(s))
+
+      IF ( cm_use_clutter_mask ) THEN
+        write(6,FMT='("CLUTTER MASKING HAS NOT BEEN IMPLEMENTED YET FOR FORAY DATA")')
+        stop
+      ENDIF
 
       DO n = 1,nfld
         
