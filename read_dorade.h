@@ -16,7 +16,7 @@
 #define FLIGHT_NUM_LEN 8
 #define FAC_NAME_LEN 8
 #define RAD_NAME_LEN 8
-#define MAX_NUM_PARMS 20 
+#define MAX_NUM_PARMS 50 
 #define PARM_NAME_LEN 8 
 #define PARM_DESC_LEN 40
 #define PARM_UNIT_LEN 8
