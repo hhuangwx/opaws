@@ -3203,338 +3203,105 @@ c###########################################################################
 c
 c     ##################################################################
 c     ######                                                      ######
-c     ######             SUBROUTINE COMPUTE_PPI_STATS             ######
-c     ######                                                      ######
-c     ##################################################################
-c
-c     PURPOSE:
-c
-c     This subroutine computes reflectivity and velocity statistics at each
-c     horizontal location in a 3D array, where the third dimension is sweep number.
-c
-c     David Dowell, March 2010
-c
-c############################################################################
-
-      subroutine compute_ppi_stats(f, el, stats, stat_names, el_angles,
-     $                             nx, ny, nz, num_el_angles, nstats)
-
-      implicit none
-
-      include 'opaws.inc'
-
-c     input variables
-      integer nx, ny            ! no. of grid points in x and y directions
-      integer nz                ! no. of sweeps
-      integer num_el_angles     ! no. of different elevation angles for which to compute statistics
-      integer nstats            ! number of different statistic types
-      real f(nx,ny,nz)          ! field for which to compute statistics
-      real el(nx,ny,nz)         ! elevation angles (deg) corresponding to each element in f
-      character(len=*) stat_names(nstats)     ! names of statistic fields
-      real el_angles(num_el_angles)           ! list of elevation angles (deg) for which to compute statistics
-
-c     returned variables
-      real stats(nx,ny,num_el_angles,nstats)     ! statistics as a function of space, elevation angle, and statistic type
-
-c     local variables
-      real data(nz)             ! valid data values for current location and elevation angle
-      integer sorted_ind(nz)    ! indices of sorted "data" array
-
-      integer count             ! number of valid values in the "data" array
-      integer total_count       ! number of sweeps for which "el" matches "el_angles" for current location
-      real mean                 ! average of elements in "data"
-      real sumsq                ! sum of squares of the elements in "data"
-      real q                    ! term inside square root in standard deviation computation
-      real maxavail             ! maximum valid value in availability array
-      
-      integer e                 ! index of current elevation angle
-      integer i, j              ! indices of current horizontal location
-      integer k                 ! index of current sweep number
-      integer s                 ! index of current statistic type
-      integer imean             ! index of mean in stats array
-      integer imedian           ! index of median in stats array
-      integer istddev           ! index of standard deviation in stats array
-      integer icount            ! index of count in stats array
-      integer iavail            ! index of data-availability rate (%) in stats array
-      integer imax              ! index of max in stats array
-      integer imin              ! index of min in stats array
-
-
-      imean = 0
-      imedian = 0
-      istddev = 0
-      icount = 0
-      imax = 0
-      imin = 0
-      do s=1, nstats
-        if (stat_names(s).eq.'mean') imean=s
-        if (stat_names(s).eq.'median') imedian=s
-        if (stat_names(s).eq.'stddev') istddev=s
-        if (stat_names(s).eq.'count') icount=s
-        if (stat_names(s).eq.'availability') iavail=s
-        if (stat_names(s).eq.'max') imax=s
-        if (stat_names(s).eq.'min') imin=s
-      end do
-
-
-      do e=1, num_el_angles
-        do i=1, nx
-          do j=1, ny
-
-            count = 0
-            total_count = 0
-            sumsq = 0.0
-
-            do k=1, nz
-              if ( (el(i,j,k).ne.sbad) .and. (abs(el(i,j,k)-el_angles(e)).le.max_el_angle_diff) ) then
-                total_count = total_count + 1
-                if (f(i,j,k).ne.sbad) then
-                  count = count + 1
-                  data(count) = f(i,j,k)
-                  sumsq = sumsq + f(i,j,k)*f(i,j,k)
-                end if
-              end if
-            end do
-            
-            if (icount.ne.0) stats(i,j,e,icount) = count
-            if (iavail.ne.0) then
-              if (total_count .eq. 0) then
-                stats(i,j,e,iavail) = sbad
-              else
-                stats(i,j,e,iavail) = 100.0 * float(count) / float(total_count)
-              end if
-            end if
-
-            if (count.eq.0) then
-              if (imean.ne.0) stats(i,j,e,imean) = sbad
-              if (imedian.ne.0) stats(i,j,e,imedian) = sbad
-              if (istddev.ne.0) stats(i,j,e,istddev) = sbad
-              if (imax.ne.0) stats(i,j,e,imax) = sbad
-              if (imin.ne.0) stats(i,j,e,imin) = sbad
-
-            else if (count.eq.1) then
-              if (imean.ne.0) stats(i,j,e,imean) = data(1)
-              if (imedian.ne.0) stats(i,j,e,imedian) = data(1)
-              if (istddev.ne.0) stats(i,j,e,istddev) = 0.0
-              if (imax.ne.0) stats(i,j,e,imax) = maxval(data(1:count))
-              if (imin.ne.0) stats(i,j,e,imin) = minval(data(1:count))
-
-            else
-              mean = sum(data(1:count)) / count
-              if (imean.ne.0) stats(i,j,e,imean) = mean
-              call sortrx(count, data, sorted_ind)
-              if (imedian.ne.0) then
-                if (mod(count,2).eq.1) then
-                  stats(i,j,e,imedian) = data(sorted_ind((count+1)/2))
-                else
-                  stats(i,j,e,imedian) = 0.5 * ( data(sorted_ind(count/2)) + data(sorted_ind(count/2 + 1)) )
-                end if
-              end if
-              if (istddev.ne.0) then
-                q = sumsq - count*mean*mean
-                q = max(q, 0.0)
-                stats(i,j,e,istddev) = sqrt( q / (count-1.0) )
-              end if
-              if (imax.ne.0) stats(i,j,e,imax) = maxval(data(1:count))
-              if (imin.ne.0) stats(i,j,e,imin) = minval(data(1:count))
-              
-c              write(*,*) 'el = ', el_angles(e)
-c              write(*,*) 'count = ', stats(i,j,e,icount)
-c              write(*,*) 'availability = ', stats(i,j,e,iavail)
-c              write(*,*) 'data = ', data(1:count)
-c              write(*,*) 'mean = ', stats(i,j,e,imean)
-c              write(*,*) 'median = ', stats(i,j,e,imedian)
-c              write(*,*) 'stddev = ', stats(i,j,e,istddev)
-c              write(*,*) 'max = ', stats(i,j,e,imax)
-c              write(*,*) 'min = ', stats(i,j,e,imin)
-c              write(*,*)
-
-            end if
-
-          end do  ! do j=1, ny
-        end do  ! do i=1, nx
-
-c       normalize availability to 100%
-        if (iavail.ne.0) then
-
-          maxavail = -huge(stats)
-          do i=1, nx
-            do j=1, ny
-              if ( (stats(i,j,e,iavail).ne.sbad) .and. (stats(i,j,e,iavail).gt.maxavail) ) maxavail = stats(i,j,e,iavail)
-            end do
-          end do
-          
-          if (maxavail .ne. -huge(stats)) then
-            do i=1, nx
-              do j=1, ny
-                if (stats(i,j,e,iavail).ne.sbad) stats(i,j,e,iavail) = stats(i,j,e,iavail) * 100.0 / maxavail
-              end do
-            end do
-          end if
-
-        end if
-
-      end do  ! do e=1, num_el_angles
-
-      return
-      end
-
-
-c###########################################################################
-c
-c     ##################################################################
-c     ######                                                      ######
 c     ######                SUBROUTINE CLUTTER_MASK               ######
 c     ######                                                      ######
 c     ##################################################################
 c
 c     PURPOSE:
 c
-c     This subroutine identifies locations of likely ground clutter based
-c     on long-term reflectivity and velocity statistics in a "ppi stats" input
-c     file.  Then, analysis data are set to bad / missing in these locations,
-c     unless the analysis reflectivity exceeds the long-term average by
-c     a specified threshold.
+c     This subroutine defines a clutter mask based on information in
+c     an output file from the "clutter_stats" program.
 c
-c     David Dowell, March 2010
+c     Original version:  David Dowell, March 2010
+c
+c     Revision:  David Dowell, July 2011
+c     - modified to read observation-space rather than grid-space statistics
 c
 c############################################################################
 
-      subroutine clutter_mask(ncfile, refl_fname, vel_fname,
-     $                        min_refl_avail, min_refl, max_refl_sd, refl_exceedance,
-     $                        min_vel_sd, max_vel, max_vel_sd,
-     $                        glon, glat, galt, nx, ny, nz, dx, dy, xmin, ymin,
-     $                        nfld, npass, el, dbz, f)
+      SUBROUTINE CLUTTER_MASK(nr, na, ne, clutter, r_coord, a_coord, e_coord, mean_refl,
+     $                        min_fixed_clutter_freq, min_moving_clutter_freq,
+     $                        halo, min_obs, min_sweeps, ncfile)
 
       implicit none
 
       include 'opaws.inc'
 
 c     input variables
-      character(len=100) ncfile      ! netcdf "ppi stats" file name for clutter masking
-      character(len=8) refl_fname    ! name of reflectivity field in "ppi stats" file
-      character(len=8) vel_fname     ! name of velocity field in "ppi stats" file
-      real min_refl_avail            ! minimum reflectivity availability (%) for clutter mask
-      real min_refl                  ! minimum reflectivity (dBZ) for clutter mask
-      real max_refl_sd               ! maximum reflectivity standard deviation (dBZ) for clutter mask
-      real refl_exceedance           ! reflectivity exceedance (dbz) for which standard clutter mask is ignored
-      real min_vel_sd                ! minimum velocity standard deviation (m/s) for highway detection in clutter mask
-      real max_vel                   ! maximum velocity absolute magnitude (m/s) for standard clutter detection in clutter mask
-      real max_vel_sd                ! maximum velocity standard deviation (m/s) for standard clutter detection in clutter mask
-      real glat, glon                ! latitude and longitude of grid origin (deg)
-      real galt                      ! altitude of grid origin (km MSL)
-      integer nx, ny                 ! no. of grid points in x and y directions
-      integer nz                     ! no. of sweeps
-      real dx, dy                    ! grid spacing in x and y directions (km)
-      real xmin, ymin                ! coordinates of southwest corner of grid, relative to origin (km)
-      integer nfld                   ! number of gridded data fields to which to apply clutter mask
-      integer npass                  ! total number of passes in objective analysis
-      real el(nx,ny,nz)              ! gridded elevation angles (deg)
-      real dbz(nx,ny,nz)             ! gridded reflectivity field (dBZ)
+
+      integer nr                       ! number of range bins
+      integer na                       ! number of azimuth-angle bins
+      integer ne                       ! number of elevation-angle bins
+      real    min_fixed_clutter_freq   ! minimum frequency (0.0 - 1.0) of fixed clutter from clutter_stats that will be considered clutter
+      real    min_moving_clutter_freq  ! minimum frequency (0.0 - 1.0) of moving clutter from clutter_stats that will be considered clutter
+      integer halo                     ! number of additional neighboring bins in each direction to search for maximum in clutter frequency
+      integer min_obs                  ! minimum number of observations for identifying clutter
+      integer min_sweeps               ! minimum number of sweeps for identifying clutter
+      character(LEN=100) ncfile        ! netcdf file that contains clutter-mask information (output from clutter_stats)
 
 c     returned variables
-      real f(nx,ny,nz,nfld,npass)    ! data fields to which to apply clutter mask
+
+      logical clutter(nr,na,ne)        ! .true. if (range, azimuth, elevation) bin has been determined to be contaminated by ground clutter
+      real r_coord(nr+1)               ! range coordinates of bin edges (km)
+      real a_coord(na+1)               ! azimuth angle coordinates of bin edges (deg)
+      real e_coord(ne+1)               ! elevation angle coordinates of bin edges (deg)
+      real mean_refl(nr,na,ne)         ! mean reflectivity (dBZ) for (range, azimuth, elevation) bin
 
 c     local variables
-      integer, parameter :: max_el_angles = 100  ! maximum number of elevation angles
-      real refl_avail(nx,ny,max_el_angles)       ! reflectivity availability (%)
-      real refl(nx,ny,max_el_angles)             ! mean reflectivity (dBZ)
-      real refl_sd(nx,ny,max_el_angles)          ! reflectivity standard deviation (dBZ)
-      real vel_sd(nx,ny,max_el_angles)           ! velocity standard deviation (m/s)
-      real vel(nx,ny,max_el_angles)              ! mean velocity (m/s)
-      logical clutter(nx,ny,max_el_angles)       ! .true. if clutter is detected based on the ppi stats
-      real el_angles(max_el_angles)              ! elevation angles (deg) for which statistics were computed
-      integer num_el_angles                      ! number of different elevation angles for which statistics were computed
-      integer i, j, k, e, n
+      integer r, a, e, rr, aa
+      real, allocatable :: freq_fixed_clutter(:,:,:)  ! frequency of gates in (range, azimuth, elevation) bin that were detected as fixed clutter
+      real, allocatable :: freq_moving_clutter(:,:,:) ! frequency of gates in (range, azimuth, elevation) bin that were detected as moving clutter
+      integer, allocatable :: total_gates(:,:,:)      ! number of gates used for computing statistics in (range, azimuth, elevation) bin
+      integer, allocatable :: total_sweeps(:,:,:)     ! number of sweeps used for computing statistics in (range, azimuth, elevation) bin
 
 
-      write(*,*) 'reading ppi stats...'
+      write(6,*) "CLUTTER_MASK:  allocating arrays..."
+      allocate(freq_fixed_clutter(nr, na, ne))
+      allocate(freq_moving_clutter(nr, na, ne))
+      allocate(total_gates(nr, na, ne))
+      allocate(total_sweeps(nr, na, ne))
 
-      call read_netcdf_ppi_stats(ncfile, refl_fname, 'availability',
-     $                           glon, glat, galt, nx, ny, dx, dy, xmin, ymin, max_el_angles,
-     $                           num_el_angles, el_angles, refl_avail)
-      call read_netcdf_ppi_stats(ncfile, refl_fname, 'mean',
-     $                           glon, glat, galt, nx, ny, dx, dy, xmin, ymin, max_el_angles,
-     $                           num_el_angles, el_angles, refl)
-      call read_netcdf_ppi_stats(ncfile, refl_fname, 'stddev',
-     $                           glon, glat, galt, nx, ny, dx, dy, xmin, ymin, max_el_angles,
-     $                           num_el_angles, el_angles, refl_sd)
-      call read_netcdf_ppi_stats(ncfile, vel_fname, 'stddev',
-     $                           glon, glat, galt, nx, ny, dx, dy, xmin, ymin, max_el_angles,
-     $                           num_el_angles, el_angles, vel_sd)
-      call read_netcdf_ppi_stats(ncfile, vel_fname, 'mean',
-     $                           glon, glat, galt, nx, ny, dx, dy, xmin, ymin, max_el_angles,
-     $                           num_el_angles, el_angles, vel)
+      write(6,*) "CLUTTER_MASK:  reading clutter stats..."
+      call READ_NETCDF_CLUTTER_STATS(ncfile, nr, na, ne, r_coord, a_coord, e_coord,
+     $                               freq_fixed_clutter, freq_moving_clutter,
+     $                               total_gates, total_sweeps, mean_refl)
 
-
-      write(*,*) 'identifying ground clutter based on ppi stats...'
+      write(6,*) "CLUTTER_MASK:  defining clutter mask..."
 
       clutter(:,:,:) = .false.
 
-      do e=1, num_el_angles
-        do j=1, ny
-          do i=1, nx
+      do e=1, ne
+        do a=1, na
+          do r=1, nr
 
-            ! detect contamination from highway traffic
-            if ( (refl_avail(i,j,e).ne.sbad)  .and. (refl_avail(i,j,e).gt.min_refl_avail) .and.
-     $           (refl(i,j,e).ne.sbad)        .and. (refl(i,j,e).gt.min_refl) .and.
-     $           (refl_sd(i,j,e).ne.sbad)     .and. (refl_sd(i,j,e).lt.max_refl_sd) .and.
-     $           (vel_sd(i,j,e).ne.sbad)      .and. (vel_sd(i,j,e).gt.min_vel_sd) ) then
-              clutter(i,j,e) = .true.
+            if ( (freq_fixed_clutter(r,a,e).ge.min_fixed_clutter_freq) .and.
+     $           (total_gates(r,a,e).ge.min_obs) .and.
+     $           (total_sweeps(r,a,e).ge.min_sweeps) ) then
+              do aa=max(1,a-halo), min(na,a+halo)
+                do rr=max(1,r-halo), min(nr,r+halo)
+                  clutter(rr,aa,e) = .true.
+                enddo
+              enddo
             endif
-            
-            ! detect contaimination from standard ground clutter
-            if ( (refl_avail(i,j,e).ne.sbad)  .and. (refl_avail(i,j,e).gt.min_refl_avail) .and.
-     $           (refl(i,j,e).ne.sbad)        .and. (refl(i,j,e).gt.min_refl) .and.
-     $           (refl_sd(i,j,e).ne.sbad)     .and. (refl_sd(i,j,e).lt.max_refl_sd) .and.
-     $           (vel(i,j,e).ne.sbad)         .and. (abs(vel(i,j,e)).lt.max_vel) .and.
-     $           (vel_sd(i,j,e).ne.sbad)      .and. (vel_sd(i,j,e).lt.max_vel_sd) ) then
-              clutter(i,j,e) = .true.
+
+            if ( (freq_moving_clutter(r,a,e).ge.min_moving_clutter_freq) .and.
+     $           (total_gates(r,a,e).ge.min_obs) .and.
+     $           (total_sweeps(r,a,e).ge.min_sweeps) ) then
+              do aa=max(1,a-halo), min(na,a+halo)
+                do rr=max(1,r-halo), min(nr,r+halo)
+                  clutter(rr,aa,e) = .true.
+                enddo
+              enddo
             endif
 
           enddo
         enddo
       enddo
 
-
-      write(*,*) 'eliminating ground clutter from gridded fields...'
-
-      do k=1, nz
-        do j=1, ny
-          do i=1, nx
-
-            if (el(i,j,k).ne.sbad) then
-
-              do e=1, num_el_angles
-
-                if ( clutter(i,j,e) .and. ( abs(el(i,j,k)-el_angles(e)) .le. max_el_angle_diff ) ) then
-
-                  if ( (dbz(i,j,k).ne.sbad) .and. (refl(i,j,e).ne.sbad) .and.
-     $                 ((dbz(i,j,k)-refl(i,j,e)).gt.refl_exceedance) ) then
-                    ! do nothing -- retain these data
-
-                  else if ( (k.gt.1) .and. ( abs(el(i,j,k-1)-el_angles(e)) .le. max_el_angle_diff ) .and.
-     $                      (dbz(i,j,k-1).ne.sbad) .and. (refl(i,j,e).ne.sbad) .and.
-     $                      ((dbz(i,j,k-1)-refl(i,j,e)).gt.refl_exceedance) ) then   ! allow for refl and vel in separate scans in 88D data
-                    ! do nothing -- retain these data
-
-                  else
-                    ! eliminate all data at this location owing to ground clutter
-                    do n=1, nfld
-                      f(i,j,k,n,:) = sbad
-                    enddo
-
-                  endif
-
-                endif
-
-              enddo  ! do e=1, num_el_angles
-
-            endif  ! if (el(i,j,k).ne.sbad)
-
-          enddo
-        enddo
-      enddo
+      deallocate(freq_fixed_clutter)
+      deallocate(freq_moving_clutter)
+      deallocate(total_gates)
+      deallocate(total_sweeps)
 
       return
       end
