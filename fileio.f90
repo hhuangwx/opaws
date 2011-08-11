@@ -421,6 +421,8 @@
     RETURN
 
 END SUBROUTINE WRITENETCDF
+
+
 !############################################################################
 !
 !     ##################################################################
@@ -880,12 +882,13 @@ END SUBROUTINE WRITENETCDF
   RETURN
   END
 
+
 !############################################################################
 !
 !     ##################################################################
 !     ##################################################################
 !     ######                                                      ######
-!     ######          SUBROUTINE WRITE_NETCDF_PPI_STATS           ######
+!     ######        SUBROUTINE WRITE_NETCDF_CLUTTER_STATS         ######
 !     ######                                                      ######
 !     ##################################################################
 !     ##################################################################
@@ -895,19 +898,19 @@ END SUBROUTINE WRITENETCDF
 !
 !     PURPOSE:
 !
-!     This subroutine writes out a netcdf file containing gridded PPI statistics.
+!     This subroutine writes out a netcdf file containing ground-clutter
+!     statistics in radar coordinates.
 !
 !     Author:  David Dowell
 !
-!     Creation Date:  March 2010
+!     Creation Date:  July 2011
 !
 !############################################################################
 
-      subroutine write_netcdf_ppi_stats(ncfile, ncgen_command, nfld, fname, f_units,           &
-                                        nstats, stat_names, stats, num_el_angles, el_angles,   &
-                                        glat, glon, galt, rlat, rlon, ralt,                    &
-                                        nx, ny, dx, dy, xmin, ymin, ut, vt,                    &
-                                        yr, mo, da, hr, mn, se)
+      subroutine WRITE_NETCDF_CLUTTER_STATS(ncfile, nr, r_coord, na, a_coord, ne, e_coord,    &
+                                            nstats, stat_names, stats)
+
+      USE netcdf
 
       implicit none
 
@@ -915,267 +918,113 @@ END SUBROUTINE WRITENETCDF
 
 !---- input parameters
 
-      character(len=80) ncfile         ! netcdf file name
-      character(len=*) ncgen_command  ! path/executable for local "ncgen" command
-      integer nfld                      ! number of fields
-      character(len=8) fname(nfld)      ! field names
-      character(len=20) f_units(nfld)   ! units
-      integer nx, ny                    ! no. of grid points in x and y directions
-      integer nstats                    ! number of different statistic types
-      integer num_el_angles             ! number of different elevation angles for which statistics were computed
+      character(len=100) ncfile        ! netcdf file name
+      integer nr                       ! number of range bins
+      real r_coord(nr+1)               ! range coordinates of bin edges (km)
+      integer na                       ! number of azimuth-angle bins
+      real a_coord(na+1)               ! azimuth angle coordinates of bin edges (deg)
+      integer ne                       ! number of elevation-angle bins
+      real e_coord(ne+1)               ! elevation angle coordinates of bin edges (deg)
+      integer nstats                   ! number of different statistic types
       character(len=20) stat_names(nstats)          ! names of statistic fields
-      real stats(nx,ny,num_el_angles,nstats,nfld)   ! statistics as a function of space, elevation angle, statistic type, and field
-      real el_angles(num_el_angles)     ! elevation angles (deg) for which statistics were computed
-      real glat, glon                   ! latitude and longitude of grid origin (deg)
-      real galt                         ! altitude of grid origin (km MSL)
-      real rlat, rlon                   ! latitude and longitude of radar (deg)
-      real ralt                         ! altitude of radar (km MSL)
-      real dx, dy                       ! grid spacing in x and y directions (km)
-      real xmin, ymin                   ! horizontal coordinates of lower southwest corner
-                                        !   of grid, relative to origin (km)
-      real ut, vt                       ! storm translation velocity (m/s)
-      integer yr, mo, da                ! year, month, and day
-      integer hr, mn, se                ! hour, minute, and second
+      real stats(nr,na,ne,nstats)      ! statistics as a function of space, elevation angle, statistic type, and field
 
+!---- Interface block for SUBROUTINE CHECK
 
+      INTERFACE
+        SUBROUTINE CHECK(status, message)
+          integer, intent (in) :: status
+          character(len=*), optional :: message
+        END SUBROUTINE CHECK
+      END INTERFACE
+      
 !---- local variables
 
-      integer i, j, k, n, s, q
-      integer ls, ls2                   ! string length
-      character(len=150) command
-      real sf(nfld)                     ! scaling factor
+      integer ncid                    ! netCDF file ID
+      integer n                       ! statistic index
+
+!---- dimension IDs
+
+      integer rc_dim      ! id's of bin center dimensions
+      integer ac_dim
+      integer ec_dim
+      integer re_dim      ! id's of bin edge dimensions
+      integer ae_dim
+      integer ee_dim
+
+!---- variable IDs
+
+      integer r_id
+      integer a_id
+      integer e_id
+      integer field_id(nstats)
+
+!---- variable shapes
+
+      integer threed_dims(3)
 
 
-      sf(:) = 1.0
 
-! DCD 1/26/11:  commented this section out because "bad" is no longer used in OPAWS2
-!      do n=1, nfld
-!        do s=1, nstats
-!          do k=1, num_el_angles
-!            do j=1, ny
-!              do i=1, nx
-!                if (stats(i,j,k,s,n).eq.bad) stats(i,j,k,s,n)=sbad
-!              enddo
-!            enddo
-!          enddo
-!        enddo
-!      enddo
+      write(6,*)
+      write(6,FMT='(" WRITE_NETCDF_CLUTTER_STATS -> INPUT DIMS NR:    ", i3)') nr
+      write(6,FMT='(" WRITE_NETCDF_CLUTTER_STATS -> INPUT DIMS NA:    ", i3)') na
+      write(6,FMT='(" WRITE_NETCDF_CLUTTER_STATS -> INPUT DIMS NE:    ", i3)') ne
 
-!     open ascii file that will be converted to netcdf
+!---- enter define mode
 
-      open(unit=11, file='ncgen.input', status='unknown')
+      call check(nf90_create(ncfile, nf90_clobber, ncid));
 
-      ls = index(ncfile, ' ') - 1
-      write(11,'(3A)') 'netcdf ', ncfile(1:ls), ' {'
+!---- define dimensions
+      
+      call check(nf90_def_dim(ncid, 'rc', nr,   rc_dim));
+      call check(nf90_def_dim(ncid, 're', nr+1, re_dim));
+      call check(nf90_def_dim(ncid, 'ac', na,   ac_dim));
+      call check(nf90_def_dim(ncid, 'ae', na+1, ae_dim));
+      call check(nf90_def_dim(ncid, 'ec', ne,   ec_dim));
+      call check(nf90_def_dim(ncid, 'ee', ne+1, ee_dim));
 
-!     "dimensions" section
+!---- define variables and attributes
 
-      write(11,'(A)') 'dimensions:'
-      write(11,'(T9,A)') 'long_string = 20 ;'
-      write(11,'(T9,A)') 'short_string = 8 ;'
-      write(11,'(T9,A)') 'date_string = 10 ;'
-      write(11,'(T9,A,I0,A)') 'x = ', nx, ' ;'
-      write(11,'(T9,A,I0,A)') 'y = ', ny, ' ;'
-      write(11,'(T9,A,I0,A)') 'el = ', num_el_angles, ' ;'
-      write(11,'(T9,A,I0,A)') 'nstats = ', nstats, ' ;'
+      call check(nf90_def_var(ncid, 'range', nf90_float, re_dim, r_id));
+      call check(nf90_put_att(ncid, r_id, 'units', 'km'))
+      call check(nf90_put_att(ncid, r_id, 'description', 'range to bin edge'))
 
-!     "variables" section
+      call check(nf90_def_var(ncid, 'az', nf90_float, ae_dim, a_id));
+      call check(nf90_put_att(ncid, a_id, 'units', 'deg'))
+      call check(nf90_put_att(ncid, a_id, 'description', 'azimuth angle of bin edge'))
 
-      write(11,'(A)') 'variables:'
-      write(11,'(T9,A)') 'char start_date(date_string) ;'
-      write(11,'(T9,A)') 'char end_date(date_string) ;'
-      write(11,'(T9,A)') 'char start_time(short_string) ;'
-      write(11,'(T9,A)') 'char end_time(short_string) ;'
-      write(11,'(T9,A)') 'int bad_data_flag ;'
-      write(11,'(T9,A)') 'float grid_latitude ;'
-      write(11,'(T17,A)') 'grid_latitude:value = "Grid origin latitude" ;'
-      write(11,'(T17,A)') 'grid_latitude:units = "deg" ;'
-      write(11,'(T9,A)') 'float grid_longitude ;'
-      write(11,'(T17,A)') 'grid_longitude:value = "Grid origin longitude" ;'
-      write(11,'(T17,A)') 'grid_longitude:units = "deg" ;'
-      write(11,'(T9,A)') 'float grid_altitude ;'
-      write(11,'(T17,A)') 'grid_altitude:value = "Altitude of grid origin" ;'
-      write(11,'(T17,A)') 'grid_altitude:units = "km MSL" ;'
-      write(11,'(T9,A)') 'float radar_latitude ;'
-      write(11,'(T17,A)') 'radar_latitude:value = "Radar latitude" ;'
-      write(11,'(T17,A)') 'radar_latitude:units = "deg" ;'
-      write(11,'(T9,A)') 'float radar_longitude ;'
-      write(11,'(T17,A)') 'radar_longitude:value = "Radar longitude" ;'
-      write(11,'(T17,A)') 'radar_longitude:units = "deg" ;'
-      write(11,'(T9,A)') 'float radar_altitude ;'
-      write(11,'(T17,A)') 'radar_altitude:value = "Altitude of radar" ;'
-      write(11,'(T17,A)') 'radar_altitude:units = "km MSL" ;'
-      write(11,'(T9,A)') 'float x_min ;'
-      write(11,'(T17,A)') 'x_min:value = "The minimum x grid value" ;'
-      write(11,'(T17,A)') 'x_min:units = "km" ;'
-      write(11,'(T9,A)') 'float y_min ;'
-      write(11,'(T17,A)') 'y_min:value = "The minimum y grid value" ;'
-      write(11,'(T17,A)') 'y_min:units = "km" ;'
-      write(11,'(T9,A)') 'float x_max ;'
-      write(11,'(T17,A)') 'x_max:value = "The maximum x grid value" ;'
-      write(11,'(T17,A)') 'x_max:units = "km" ;'
-      write(11,'(T9,A)') 'float y_max ;'
-      write(11,'(T17,A)') 'y_max:value = "The maximum y grid value" ;'
-      write(11,'(T17,A)') 'y_max:units = "km" ;'
-      write(11,'(T9,A)') 'float x_spacing ;'
-      write(11,'(T17,A)') 'x_spacing:units = "km" ;'
-      write(11,'(T9,A)') 'float y_spacing ;'
-      write(11,'(T17,A)') 'y_spacing:units = "km" ;'
+      call check(nf90_def_var(ncid, 'el', nf90_float, ee_dim, e_id));
+      call check(nf90_put_att(ncid, e_id, 'units', 'deg'))
+      call check(nf90_put_att(ncid, e_id, 'description', 'elevation angle of bin edge'))
 
-      write(11,'(T9,A)') 'float x(x) ;'
-      write(11,'(T9,A)') 'float y(y) ;'
-      write(11,'(T9,A)') 'float el(el) ;'
-      write(11,'(T9,A)') 'float u_translation ;'
-      write(11,'(T17,A)') 'u_translation:value = "storm motion u component" ;'
-      write(11,'(T17,A)') 'u_translation:units = "m/s" ;'
-      write(11,'(T9,A)') 'float v_translation ;'
-      write(11,'(T17,A)') 'v_translation:value = "storm motion v component" ;'
-      write(11,'(T17,A)') 'v_translation:units = "m/s" ;'
-      write(11,'(T9,A)') 'char stat_names(nstats, long_string) ;'
+      threed_dims(1) = rc_dim
+      threed_dims(2) = ac_dim
+      threed_dims(3) = ec_dim
 
-      do n=1, nfld
-        ls = index(fname(n), ' ') - 1
-        ls2 = index(f_units(n), ' ') - 1
-        write(11,'(T9,A,A,A)') 'float ', fname(n)(1:ls), '(nstats, el, y, x) ;'
-        write(11,'(T17,A,A,A,A)') fname(n)(1:ls), ':units = "', f_units(n)(1:ls2), '" ;'
-        write(11,'(T17,A,A,ES14.7,A)') fname(n)(1:ls), ':scale_factor = ', sf(n), ' ;'
-        write(11,'(T17,A,A)') fname(n)(1:ls), ':add_offset = 0.0 ;'
-        write(11,'(T17,A,A,ES14.7,A,ES14.7,A)') fname(n)(1:ls), ':missing_value = ', sbad, ', ', sbad, ' ;'
+      do n=1, nstats
+        call check(nf90_def_var(ncid, stat_names(n), nf90_float, threed_dims, field_id(n)));
+        call check(nf90_put_att(ncid, field_id(n), 'missing_value', sbad))
       enddo
 
-!     "data" section
+!---- leave define mode
 
-      write(11,'(A)') 'data:'
-      write(11,*)
-      write(11,'(A,I2.2,A,I2.2,A,I4.4,A)') ' start_date = "', mo, '/', da, '/', yr, '" ;'
-      write(11,*)
-      write(11,'(A,I2.2,A,I2.2,A,I4.4,A)') ' end_date = "', mo, '/', da, '/', yr, '" ;'
-      write(11,*)
-      write(11,'(A,I2.2,A,I2.2,A,I2.2,A)') ' start_time = "', hr, ':', mn, ':', se, '" ;'
-      write(11,*)
-      write(11,'(A,I2.2,A,I2.2,A,I2.2,A)') ' end_time = "', hr, ':', mn, ':', se, '" ;'
-      write(11,*)
-      write(11,'(A,I0,A)') ' bad_data_flag = ', int(sbad), ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' grid_latitude = ', glat, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' grid_longitude = ', glon, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' grid_altitude = ', galt, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' radar_latitude = ', rlat, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' radar_longitude = ', rlon, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' radar_altitude = ', ralt, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' x_min = ', xmin, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' y_min = ', ymin, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' x_max = ', xmin+(nx-1)*dx, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' y_max = ', ymin+(ny-1)*dy, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' x_spacing = ', dx, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' y_spacing = ', dy, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' u_translation = ', ut, ' ;'
-      write(11,*)
-      write(11,'(A,ES14.7,A)') ' v_translation = ', vt, ' ;'
-      write(11,*)
+      call check(nf90_enddef(ncid));
 
-      write(11,'(A)', advance='no') ' x = '
-      do i=1, nx
-        write(11,'(ES14.7)', advance='no') xmin+(i-1)*dx
-        if (i.eq.nx) then
-          write(11,'(A)') ' ;'
-        else
-          write(11,'(A)', advance='no') ', '
-          if (mod(i,5).eq.4) write(11,*)
-        endif
-      enddo
-      write(11,*)
+!---- write variables                                                                                                                                                                                                     
 
-      write(11,'(A)', advance='no') ' y = '
-      do j=1, ny
-        write(11,'(ES14.7)', advance='no') ymin+(j-1)*dy
-        if (j.eq.ny) then
-          write(11,'(A)') ' ;'
-        else
-          write(11,'(A)', advance='no') ', '
-          if (mod(j,5).eq.4) write(11,*)
-        endif
-      enddo
-      write(11,*)
+      call check( nf90_put_var(ncid, r_id, r_coord) )
+      call check( nf90_put_var(ncid, a_id, a_coord) )
+      call check( nf90_put_var(ncid, e_id, e_coord) )
+      
+      DO n=1, nstats
+        call check( nf90_put_var(ncid, field_id(n), stats(:,:,:,n)) )
+      ENDDO
 
-      write(11,'(A)', advance='no') ' el = '
-      do k=1, num_el_angles
-        write(11,'(ES14.7)', advance='no') el_angles(k)
-        if (k.eq.num_el_angles) then
-          write(11,'(A)') ' ;'
-        else
-          write(11,'(A)', advance='no') ', '
-          if (mod(k,5).eq.4) write(11,*)
-        endif
-      enddo
-      write(11,*)
+      call check( nf90_close(ncid) )
 
-      write(11,'(A)') ' stat_names = '
-      do s=1, nstats
-        write(11,'(A,A20,A)', advance='no') '  "', stat_names(s), '"'
-        if (s.eq.nstats) then
-          write(11,'(A)') ' ;'
-        else
-          write(11,'(A)') ','
-        endif
-      enddo
+      RETURN
 
-!     Write 4D fields.
-
-      do n=1, nfld
-
-        write(11,*)
-        ls = index(fname(n), ' ') - 1
-        write(11,'(1X,A,A,A)') ' ', fname(n)(1:ls), ' ='
-        q = 0
-
-        do s=1, nstats
-          do k=1, num_el_angles
-            do j=1, ny
-              do i=1, nx
-                write(11,'(ES14.7)', advance='no') stats(i,j,k,s,n)
-                q = q + 1
-                if (q.eq.(nx*ny*num_el_angles*nstats)) then
-                  write(11,'(A)') ' ;'
-                else
-                  write(11,'(A)', advance='no') ', '
-                  if (mod(q,5).eq.4) write(11,*)
-                endif
-              enddo
-            enddo
-          enddo
-        enddo
-
-      enddo
-
-!     Write final character and then close file.
-
-      write(11,'(A)') '}'
-      close(11)
-
-!     Convert ascii file to netcdf.
-
-      ls = index(ncfile, ' ') - 1
-      write(command,'(A,A,A)') ncgen_command//' -o ', ncfile(1:ls), ' ncgen.input'
-
-      write(6,FMT='(1x,A,A)') 'Now executing command = ', command
-
-      call system(command)
-
-      return
-      end
+      END SUBROUTINE WRITE_NETCDF_CLUTTER_STATS
 
 
 !############################################################################
@@ -1183,7 +1032,7 @@ END SUBROUTINE WRITENETCDF
 !     ##################################################################
 !     ##################################################################
 !     ######                                                      ######
-!     ######           SUBROUTINE READ_NETCDF_PPI_STATS           ######
+!     ######      SUBROUTINE READ_NETCDF_CLUTTER_STAT_DIMS        ######
 !     ######                                                      ######
 !     ##################################################################
 !     ##################################################################
@@ -1193,286 +1042,178 @@ END SUBROUTINE WRITENETCDF
 !
 !     PURPOSE:
 !
-!     This subroutine reads in a specified statistics field from a netcdf file
-!     containing gridded PPI statistics.  If the grid parameters in the netcdf
-!     file do not match the specified input parameters, then the subroutine fails.
+!     This subroutine reads variable dimensions from a netcdf file produced
+!     by the clutter_stats program.
 !
 !     Author:  David Dowell
 !
-!     Creation Date:  March 2010
+!     Creation Date:  July 2011
 !
 !############################################################################
 
-      subroutine read_netcdf_ppi_stats(ncfile, fname, stat_name,                    &
-                                       glon, glat, galt,                            &
-                                       nx, ny, dx, dy, xmin, ymin, max_el_angles,   &
-                                       num_el_angles, el_angles, stat)
+      subroutine READ_NETCDF_CLUTTER_STAT_DIMS(ncfile, nr, na, ne)
+
+      USE netcdf
 
       implicit none
 
       include 'opaws.inc'
-      include 'netcdf.inc'
 
 !---- input parameters
 
-      character(len=80) ncfile         ! input netcdf file name
-      character(len=8) fname            ! field name
-      character(len=*) stat_name        ! name of statistical field
-      real glon, glat                   ! latitude and longitude of grid origin (deg)
-      real galt                         ! altitude of grid origin (km MSL)
-      integer nx, ny                    ! no. of grid points in x and y directions
-      real dx, dy                       ! grid spacing in x and y directions (km)
-      real xmin, ymin                   ! horizontal coordinates of lower southwest corner
-                                        !   of grid, relative to origin (km)
-      integer max_el_angles             ! maximum number of elevation angles
+      character(len=100) ncfile                ! input netcdf file name
 
 !---- returned variables
+      integer nr                               ! number of range bins
+      integer na                               ! number of azimuth-angle bins
+      integer ne                               ! number of elevation-angle bins
 
-      integer num_el_angles             ! number of different elevation angles for which statistics were computed
-      real el_angles(max_el_angles)     ! elevation angles (deg) for which statistics were computed
-      real stat(nx,ny,max_el_angles)    ! statistics as a function of space and elevation angle
+!---- Interface block for SUBROUTINE CHECK
 
+      INTERFACE
+        SUBROUTINE CHECK(status, message)
+          integer, intent (in) :: status
+          character(len=*), optional :: message
+        END SUBROUTINE CHECK
+      END INTERFACE
+      
 !---- local variables
 
-      integer ncid, status, id
-      real iglon, iglat                 ! latitude and longitude input from ncfile (deg)
-      real igalt                        ! altitude input from ncfile (km MSL)
-      integer inx, iny                  ! no. of grid points in x and y directions, input from ncfile
-      real idx, idy                     ! grid spacing in x and y directions (km), input from ncfile
-      real ixmin, iymin                 ! horizontal coordinates of lower southwest corner
-                                        !   of grid, relative to origin (km), input from ncfile
-      integer nstats                                     ! number of different statistic types
-      character(len=20), allocatable :: stat_names(:)    ! names of statistic fields
-      real, allocatable :: stats(:,:,:,:)                ! statistics as a function of space, elevation angle, and statistic type
-      integer stat_index                                 ! index of specified statistic type
-!      integer i, j
-      integer k, n
+      integer ncid                    ! netCDF file ID
+      integer id                      ! dimension / variable id
 
 
-!     Read grid dimensions and check for agreement with expected values.
-      call get_dims_netcdf(ncfile, inx, iny, num_el_angles)
-      if (inx .ne. nx) then
-        write(*,*) 'inx and nx are not the same:  ', inx, nx
-        stop
-      endif
-      if (iny .ne. ny) then
-        write(*,*) 'iny and ny are not the same:  ', iny, ny
-        stop
-      endif
-      if (num_el_angles .gt. max_el_angles) then
-        write(*,*) 'num_el_angles too large:  ', num_el_angles, max_el_angles
-        stop
-      endif
+      write(6,*)
+      write(6,*) "READ_NETCDF_CLUTTER_STAT_DIMS -> INPUT FILE:"
+      write(6,*) ncfile
 
-!     Open netcdf file.
+      call check(nf90_open(ncfile, nf90_nowrite, ncid));
 
-      status = NF_OPEN(ncfile, NF_NOWRITE, ncid)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem opening file: ', NF_STRERROR(status), ncid
-        stop
-      endif
+      call check(nf90_inq_dimid(ncid, 'rc', id));
+      call check(nf90_inquire_dimension(ncid, id, len = nr));
 
-!     Read scalar variables.
+      call check(nf90_inq_dimid(ncid, 'ac', id));
+      call check(nf90_inquire_dimension(ncid, id, len = na));
 
-! DCD 1/26/11 changed bad to sbad
-      el_angles(:) = sbad
-      status = NF_INQ_VARID(ncid, 'el', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for el: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, el_angles(1:num_el_angles))
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining el: ', NF_STRERROR(status)
-        stop
-      endif
+      call check(nf90_inq_dimid(ncid, 'ec', id));
+      call check(nf90_inquire_dimension(ncid, id, len = ne));
 
-      status = NF_INQ_VARID(ncid, 'grid_latitude', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for iglat: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, iglat)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining iglat: ', NF_STRERROR(status)
-        stop
-      endif
-      if (iglat .ne. glat) then
-        write(*,*) 'iglat and glat are not the same:  ', iglat, glat
-        stop
-      endif
+      call check( nf90_close(ncid) )
 
-      status = NF_INQ_VARID(ncid, 'grid_longitude', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for iglon: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, iglon)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining iglon: ', NF_STRERROR(status)
-        stop
-      endif
-      if (iglon .ne. glon) then
-        write(*,*) 'iglon and glon are not the same:  ', iglon, glon
-        stop
-      endif
+      RETURN
 
-      status = NF_INQ_VARID(ncid, 'grid_altitude', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for igalt: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, igalt)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining igalt: ', NF_STRERROR(status)
-        stop
-      endif
-      if (igalt .ne. galt) then
-        write(*,*) 'igalt and galt are not the same:  ', igalt, galt
-        stop
-      endif
-
-      status = NF_INQ_VARID(ncid, 'x_spacing', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for idx: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, idx)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining idx: ', NF_STRERROR(status)
-        stop
-      endif
-      if (idx .ne. dx) then
-        write(*,*) 'idx and dx are not the same:  ', idx, dx
-        stop
-      endif
-
-      status = NF_INQ_VARID(ncid, 'y_spacing', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for idy: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, idy)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining idy: ', NF_STRERROR(status)
-        stop
-      endif
-      if (idy .ne. dy) then
-        write(*,*) 'idy and dy are not the same:  ', idy, dy
-        stop
-      endif
-
-      status = NF_INQ_VARID(ncid, 'x_min', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for ixmin: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, ixmin)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining ixmin: ', NF_STRERROR(status)
-        stop
-      endif
-      if (ixmin .ne. xmin) then
-        write(*,*) 'ixmin and xmin are not the same:  ', ixmin, xmin
-        stop
-      endif
-
-      status = NF_INQ_VARID(ncid, 'y_min', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for iymin: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, iymin)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining iymin: ', NF_STRERROR(status)
-        stop
-      endif
-      if (iymin .ne. ymin) then
-        write(*,*) 'iymin and ymin are not the same:  ', iymin, ymin
-        stop
-      endif
-
-!     Read statistic names.
-
-      status = NF_INQ_DIMID(ncid, 'nstats', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for nstats: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_INQ_DIMLEN(ncid, id, nstats)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining nstats: ', NF_STRERROR(status)
-        stop
-      endif
-
-      allocate(stat_names(nstats))
-
-      status = NF_INQ_VARID(ncid, 'stat_names', id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for stat_names: ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_TEXT(ncid, id, stat_names)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining stat_names: ', NF_STRERROR(status)
-        stop
-      endif
-
-      stat_index = 0
-      do n=1, nstats
-        if (index(stat_names(n), stat_name) .ne. 0) stat_index = n
-      enddo
-      if (stat_index .eq. 0) then
-        write(*,*) 'Could not find matching stat_name:  ', stat_name
-        stop
-      endif
-
-      deallocate(stat_names)
-
-!     Read entire statistics array and return specified portion.
-
-      allocate(stats(nx,ny,num_el_angles,nstats))
-
-      status = NF_INQ_VARID(ncid, fname, id)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining id for ', fname, ': ', NF_STRERROR(status)
-        stop
-      endif
-      status = NF_GET_VAR_REAL(ncid, id, stats)
-      if (status .ne. NF_NOERR) then
-        write(*,*) 'Problem obtaining ', fname, ': ', NF_STRERROR(status)
-        stop
-      endif
-
-! DCD 1/26/11:  making "bad" obsolete, to be consistent with NSSL_Oban2D
-!      do n=1, nstats
-!        do k=1, num_el_angles
-!          do j=1, ny
-!            do i=1, nx
-!              if (stats(i,j,k,n).eq.sbad) stats(i,j,k,n)=bad
-!            enddo
-!          enddo
-!        enddo
-!      enddo
-
-! DCD 1/26/11:  changed "bad" to "sbad"
-      stat(:,:,:) = sbad
-      do k=1, num_el_angles
-        stat(:,:,k) = stats(:,:,k,stat_index)
-      end do
-
-      deallocate(stats)
-
-!     Close  netcdf file
-
-      status=NF_CLOSE(ncid)
-      if (status.ne.NF_NOERR) then
-        write(*,*) 'Error closing file: ', NF_STRERROR(status)
-      endif
+      END SUBROUTINE READ_NETCDF_CLUTTER_STAT_DIMS
 
 
-      return
-      end
+!############################################################################
+!
+!     ##################################################################
+!     ##################################################################
+!     ######                                                      ######
+!     ######        SUBROUTINE READ_NETCDF_CLUTTER_STATS          ######
+!     ######                                                      ######
+!     ##################################################################
+!     ##################################################################
+!
+!
+!############################################################################
+!
+!     PURPOSE:
+!
+!     This subroutine reads a netcdf file produced by the clutter_stats program.
+!
+!     Author:  David Dowell
+!
+!     Creation Date:  July 2011
+!
+!############################################################################
+
+      subroutine READ_NETCDF_CLUTTER_STATS(ncfile, nr, na, ne, r, a, e,               &
+                                           freq_fixed_clutter, freq_moving_clutter,   &
+                                           total_gates, total_sweeps, mean_refl)
+
+      USE netcdf
+
+      implicit none
+
+      include 'opaws.inc'
+
+!---- input parameters
+
+      character(len=100) ncfile                       ! input netcdf file name
+      integer nr                                      ! number of range bins
+      integer na                                      ! number of azimuth-angle bins
+      integer ne                                      ! number of elevation-angle bins
+
+!---- returned variables
+      real r(nr+1)                         ! range coordinates of bin edges (km)
+      real a(na+1)                         ! azimuth angle coordinates of bin edges (deg)
+      real e(ne+1)                         ! elevation angle coordinates of bin edges (deg)
+      real freq_fixed_clutter(nr,na,ne)    ! frequency of gates in (range, azimuth, elevation) bin that were detected as fixed clutter
+      real freq_moving_clutter(nr,na,ne)   ! frequency of gates in (range, azimuth, elevation) bin that were detected as moving clutter
+      integer total_gates(nr,na,ne)        ! number of gates used for computing statistics in (range, azimuth, elevation) bin
+      integer total_sweeps(nr,na,ne)       ! number of sweeps used for computing statistics in (range, azimuth, elevation) bin
+      real mean_refl(nr,na,ne)             ! mean reflectivity (dBZ) for (range, azimuth, elevation) bin
+
+!---- Interface block for SUBROUTINE CHECK
+
+      INTERFACE
+        SUBROUTINE CHECK(status, message)
+          integer, intent (in) :: status
+          character(len=*), optional :: message
+        END SUBROUTINE CHECK
+      END INTERFACE
+      
+!---- local variables
+
+      integer ncid                    ! netCDF file ID
+      integer id                      ! dimension / variable id
+      real, allocatable :: temp(:,:,:)
+
+
+
+      write(6,*)
+      write(6,*) "READ_NETCDF_CLUTTER_STATS -> INPUT FILE:"
+      write(6,*) ncfile
+
+      call check(nf90_open(ncfile, nf90_nowrite, ncid))
+
+      allocate(temp(nr, na, ne))
+
+      call check(nf90_inq_varid(ncid, 'range', id))
+      call check(nf90_get_var(ncid, id, r))
+
+      call check(nf90_inq_varid(ncid, 'az', id))
+      call check(nf90_get_var(ncid, id, a))
+
+      call check(nf90_inq_varid(ncid, 'el', id))
+      call check(nf90_get_var(ncid, id, e))
+
+      call check(nf90_inq_varid(ncid, 'freq_fixed_clutter', id))
+      call check(nf90_get_var(ncid, id, freq_fixed_clutter))
+
+      call check(nf90_inq_varid(ncid, 'freq_moving_clutter', id))
+      call check(nf90_get_var(ncid, id, freq_moving_clutter))
+
+      call check(nf90_inq_varid(ncid, 'total_gates', id))
+      call check(nf90_get_var(ncid, id, temp))
+      total_gates(:,:,:) = nint(temp(:,:,:))
+
+      call check(nf90_inq_varid(ncid, 'total_sweeps', id))
+      call check(nf90_get_var(ncid, id, temp))
+      total_sweeps(:,:,:) = nint(temp(:,:,:))
+
+      call check(nf90_inq_varid(ncid, 'mean_reflectivity', id))
+      call check(nf90_get_var(ncid, id, mean_refl))
+
+      call check( nf90_close(ncid) )
+
+      deallocate(temp)
+
+      RETURN
+
+      END SUBROUTINE READ_NETCDF_CLUTTER_STATS
+
 
 !############################################################################
 !
