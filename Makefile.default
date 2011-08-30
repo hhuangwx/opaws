@@ -41,8 +41,8 @@ CFLAGS = -m32 -c -g -I. -DLONG32 -DUNDERSCORE -DLITTLE
 EXEC = x.oban
 EXECcs = x.clutter_stats
 
-OBJS = DART.o oban_module.o dict_module.o opaws_namelists.o derived_types.o util.o fileio.o read_dorade.o binio.o v5d.o 
-OBJScs = DART.o dict_module.o opaws_namelists.o derived_types.o fileio.o util.o read_dorade.o binio.o v5d.o
+OBJS = DART.o oban_module.o dict_module.o oban_namelist.o derived_types.o util.o fileio.o read_dorade.o binio.o v5d.o 
+OBJScs = DART.o dict_module.o oban_namelist.o derived_types.o fileio.o util.o read_dorade.o binio.o v5d.o
 
 default: $(EXEC) $(EXECcs)
 
@@ -81,8 +81,8 @@ DART.o: DART.f
 derived_types.o: derived_types.f90
 	$(FC) $(OPT) -c derived_types.f90
 
-opaws_namelists.o: opaws_namelists.f90 opaws.inc
-	$(FC) $(OPT) -c opaws_namelists.f90
+oban_namelist.o: oban_namelist.f90 opaws.inc
+	$(FC) $(OPT) -c oban_namelist.f90
 
 dict_module.o: dict_module.f90
 	$(FC) $(OPT) -c dict_module.f90
