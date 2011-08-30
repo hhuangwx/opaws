@@ -536,9 +536,11 @@ void read_rdat(FILE *fp,char fld_name[],int fld_num,
    for (t_strsize=0;t_strsize<strlen(tempname);t_strsize++) {
        if (isspace(tempname[t_strsize])) {break;}
    }
+   if (t_strsize>PARM_NAME_LEN) {t_strsize=PARM_NAME_LEN;}
 
    /* FIND THE CORRECT FIELD */
    /* modified 11/10/10 by David Dowell */
+
    if ( (i_strsize==t_strsize) && (strncmp(tempname,inputname,t_strsize)==0)) {
 
       *match=TRUE;
