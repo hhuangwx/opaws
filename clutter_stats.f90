@@ -88,6 +88,8 @@ PROGRAM CLUTTER_STATS
 
   include 'opaws.inc'
 
+  character(LEN=128), parameter :: version = "Version 2.0.2:  Updated 30 August 2011 [DCD]"
+
   character(len=255), allocatable, dimension(:) :: swpfilename    ! names of radar-data sweep files
 
   real, allocatable :: r_coord(:)                    ! range coordinates of bin edges (km)
@@ -116,7 +118,8 @@ PROGRAM CLUTTER_STATS
 !############################################################################
       
   write(6,*)
-  write(6,*) 'PROGRAM CLUTTER_STATS'
+  write(6,'("PROGRAM CLUTTER_STATS ")')
+  write(6,'(a)') version
 
   indx = iargc( )
   IF ( indx .eq. 1 ) THEN
@@ -145,7 +148,7 @@ PROGRAM CLUTTER_STATS
 
 ! Logical for various types of sweepfile input
 
-  IF (nswp.eq.-1) THEN
+  IF (number_of_sweeps.eq.-1) THEN
 
     open(unit=lunr,file=infile,status='old')
 
@@ -170,19 +173,19 @@ PROGRAM CLUTTER_STATS
     close(lunr)
 
     open(unit=11, file='sweep_file_list.txt', status='old')     ! count number of sweep files
-    nswp = 0
+    number_of_sweeps = 0
     iostat = 0
     DO WHILE (iostat == 0 ) 
       read(11,*,iostat=iostat) sfname0
-      nswp = nswp + 1
+      number_of_sweeps = number_of_sweeps + 1
     ENDDO
     close(11)
-    nswp = nswp - 1
+    number_of_sweeps = number_of_sweeps - 1
 
-    allocate(swpfilename(nswp))
+    allocate(swpfilename(number_of_sweeps))
     
     open(unit=11, file='sweep_file_list.txt', status='old')     ! read sweep file names
-    DO s = 1,nswp
+    DO s = 1,number_of_sweeps
       read(11,'(A)',end=12) swpfilename(s)
       write(6,FMT='(2x,"SWP filename:  ",i5.5,1x,a)') s, trim(swpfilename(s))
     ENDDO
@@ -193,7 +196,7 @@ PROGRAM CLUTTER_STATS
 
   ELSE
 
-    allocate(swpfilename(nswp))
+    allocate(swpfilename(number_of_sweeps))
 
 ! Added code here to skip over the namelists and get to the raw ascii input at bottom of file
 
@@ -205,7 +208,7 @@ PROGRAM CLUTTER_STATS
 
 ! Now do what we normally do
     
-    DO s = 1,nswp
+    DO s = 1,number_of_sweeps
       read(lunr,'(A)') swpfilename(s)
       write(6,FMT='("SWP filename:  ",i5.5,1x,a)') s, trim(swpfilename(s))
     ENDDO
@@ -247,12 +250,12 @@ PROGRAM CLUTTER_STATS
 !
 !############################################################################
 
-  call COMPUTE_CLUTTER_STATS(nswp, swpfilename, radar_data_format,       &
-                             refl_field_name, vel_field_name,            &
-                             use_min_refl_threshold, min_refl,           &
-                             use_max_vel_threshold, max_vel,             &
-                             use_min_vel_sd_threshold, min_vel_sd,       &
-                             rmin, dr, nr, amin, da, na, emin, de, ne,   &
+  call COMPUTE_CLUTTER_STATS(number_of_sweeps, swpfilename, input_data_format,  &
+                             refl_field_name, vel_field_name,                   &
+                             use_min_refl_threshold, min_refl,                  &
+                             use_max_vel_threshold, max_vel,                    &
+                             use_min_vel_sd_threshold, min_vel_sd,              &
+                             rmin, dr, nr, amin, da, na, emin, de, ne,          &
                              nstats, stat_names, stats)
 
 !############################################################################
@@ -306,12 +309,12 @@ END PROGRAM CLUTTER_STATS
 !
 !############################################################################
 
-SUBROUTINE COMPUTE_CLUTTER_STATS(nswp, swpfilename, radar_data_format,      &
-                                 refl_field_name, vel_field_name,           &
-                                 use_min_refl_threshold, min_refl,          &
-                                 use_max_vel_threshold, max_vel,            &
-                                 use_min_vel_sd_threshold, min_vel_sd,      &
-                                 rmin, dr, nr, amin, da, na, emin, de, ne,  &
+SUBROUTINE COMPUTE_CLUTTER_STATS(number_of_sweeps, swpfilename, input_data_format,  &
+                                 refl_field_name, vel_field_name,                   &
+                                 use_min_refl_threshold, min_refl,                  &
+                                 use_max_vel_threshold, max_vel,                    &
+                                 use_min_vel_sd_threshold, min_vel_sd,              &
+                                 rmin, dr, nr, amin, da, na, emin, de, ne,          &
                                  nstats, stat_names, stats)
 
   implicit none
@@ -321,11 +324,11 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(nswp, swpfilename, radar_data_format,      &
 
 ! input variables
 
-  integer nswp                            ! number of sweep files
-  character(len=*) swpfilename(nswp)      ! names of radar-data sweep files
-  integer radar_data_format               ! format for input radar data:
-                                            !   1 == dorade sweep files
-                                            !   2 == netcdf (FORAY)
+  integer number_of_sweeps                ! number of sweep files
+  character(len=*) swpfilename(number_of_sweeps)      ! names of radar-data sweep files
+  integer input_data_format               ! format for input radar data:
+                                          !   1 == dorade sweep files
+                                          !   2 == netcdf (FORAY)
   character(len=8) refl_field_name        ! name of reflectivity field
   character(len=8) vel_field_name         ! name of velocity field
   logical use_min_refl_threshold          ! .true. if minimum reflectivity threshold should be used for detecting clutter
@@ -428,11 +431,11 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(nswp, swpfilename, radar_data_format,      &
   vel_sum(:,:,:) = 0.0
   vel_sq_sum(:,:,:) = 0.0
 
-  DO s = 1, nswp
+  DO s = 1, number_of_sweeps
 
     data_from_current_sweep(:,:,:) = .false.
 
-    IF (radar_data_format.eq.1) THEN
+    IF (input_data_format.eq.1) THEN
 
       write(6,FMT='("sweep file: ",a)') trim(swpfilename(s))
 
@@ -503,10 +506,10 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(nswp, swpfilename, radar_data_format,      &
         ENDDO
       ENDDO
 
-    ENDIF     ! if (radar_data_format.eq.1)
+    ENDIF     ! if (input_data_format.eq.1)
 
-    IF (radar_data_format.eq.2) then
-      write(6,*) 'COMPUTE_CLUTTER_STATS:  unsupported radar_data_format = ', radar_data_format
+    IF (input_data_format.eq.2) then
+      write(6,*) 'COMPUTE_CLUTTER_STATS:  unsupported input_data_format = ', input_data_format
       stop
     ENDIF
 
@@ -518,7 +521,7 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(nswp, swpfilename, radar_data_format,      &
       ENDDO
     ENDDO
 
-  ENDDO   ! DO s = 1, nswp
+  ENDDO   ! DO s = 1, number_of_sweeps
 
 
   DO n=1, nr
