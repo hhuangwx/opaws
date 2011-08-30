@@ -53,9 +53,18 @@ BUILD instructions
 
 3.  Setup proper links to the netCDF libs.  The fortran needs the include directory to use the netcdf module interface.
 
-4.  Compile by typing "make".  One executable is built:  "x.oban
+4.  Compile by typing "make".  Two executables are built:  x.oban and x.clutter_stats
 
 ================================================================================
+
+changes for version 2.0.2 of OPAWS (30 August 2011) - DCD
+---------------------------------------------------------------------------
+* Changed the name of opaws_namelists.f90 back to oban_namelist.f90
+* Renamed the following parameters in cs_parameters in oban_namelist.f90 and also in clutter_stats.f90,
+  to avoid conflicts with oban_parameters:
+  - radar_data_format renamed to input_data_format
+  - nswp renamed to number_of_sweeeps
+* Added code to read_dorade.c and fileio.f90 to handle special case of 8-character parameter name
 
 changes for version 2.0.1 of OPAWS (10 August 2011) - DCD
 ---------------------------------------------------------------------------
