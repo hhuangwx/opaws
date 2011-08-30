@@ -93,7 +93,7 @@ PROGRAM OBAN
   include 'v5df.h'
   include 'structures.inc'
 
-  character(LEN=128), parameter :: version = "Version 2.0.1:  Updated 8 August 2011 [DCD]"
+  character(LEN=128), parameter :: version = "Version 2.0.2:  Updated 30 August 2011 [DCD]"
 
   integer i, j, k, ns, np, nf                 ! loop variables
   integer ls                                  ! length of input string
