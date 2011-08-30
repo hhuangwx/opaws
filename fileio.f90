@@ -302,6 +302,9 @@
 
       DO n = 1,nfld
         ls = index(anal%name(n), ' ') - 1
+
+        if (ls .eq. -1) ls = 8       ! DCD 8/18/11 handle special case of field name that is 8 characters
+
         call check(nf90_def_var(ncid, anal%name(n)(1:ls), nf90_float, field_dims, field_ids(n)))
         call check(nf90_put_att(ncid, field_ids(n), 'scale_factor', sf(n)))
         call check(nf90_put_att(ncid, field_ids(n), 'add_offset', 0.0))
@@ -408,7 +411,7 @@
       call check( nf90_put_var(ncid, TIME_id, anal%time) )
       call check( nf90_put_var(ncid, HEIGHT_id, anal%height) )
       call check( nf90_put_var(ncid, field_names_id, fieldname) )
-      
+
       DO n = 1,nfld
         call check( nf90_put_var(ncid, field_ids(n), anal%f(:,:,:,n,:)) )
       ENDDO
