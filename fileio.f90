@@ -1776,6 +1776,7 @@ END SUBROUTINE WRITENETCDF
       integer n
       integer npass
       real z(nz)
+      real, allocatable :: in4d(:,:,:,:)
       real, allocatable :: in5d(:,:,:,:,:)
 
 
@@ -1953,17 +1954,24 @@ END SUBROUTINE WRITENETCDF
 
 !     Read 3D arrays.
 
-
+      allocate(in4d(nx,ny,nz,1))
       allocate(in5d(nx,ny,nz,npass,1))
 
       do n=1, nfld
+
         status = NF_INQ_VARID(ncid, fname(n), id)
         if (status .ne. NF_NOERR) then
           write(*,*) 'Problem obtaining id for ', fname(n), ': ', NF_STRERROR(status)
           stop
         endif
-        status = NF_GET_VAR_REAL(ncid, id, in5d)
-        f(:,:,:,n) = in5d(:,:,:,npass,1)
+
+        if ( (fname(n).eq.'EL') .or. (fname(n).eq.'AZ') .or. (fname(n).eq.'TIME') .or. (fname(n).eq.'HEIGHT') ) then
+          status = NF_GET_VAR_REAL(ncid, id, in4d)
+          f(:,:,:,n) = in4d(:,:,:,1)
+        else
+          status = NF_GET_VAR_REAL(ncid, id, in5d)
+          f(:,:,:,n) = in5d(:,:,:,npass,1)
+        endif
         if (status .ne. NF_NOERR) then
           write(*,*) 'Problem obtaining ', fname(n), ': ', NF_STRERROR(status)
           stop
@@ -1971,6 +1979,7 @@ END SUBROUTINE WRITENETCDF
 
       enddo
 
+      deallocate(in4d)
       deallocate(in5d)
 
 !     Close  netcdf file
