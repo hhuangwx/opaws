@@ -1706,7 +1706,7 @@ END SUBROUTINE WRITENETCDF
     
       IF( status /= nf90_noerr ) THEN 
         IF( present(message) ) THEN
-          write(6,*), message//"  "//trim(nf90_strerror(status))
+          write(6,*) message//"  "//trim(nf90_strerror(status))
           stop "Stopped by Subroutine CHECK"
         ELSE
           write(6,*) trim(nf90_strerror(status))

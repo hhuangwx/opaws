@@ -175,10 +175,10 @@
 !
 ! miscellaneous routines:
 !
-      character*80   nf_inq_libvers
+      character(len=80)   nf_inq_libvers
       external       nf_inq_libvers
 
-      character*80   nf_strerror
+      character(len=80)   nf_strerror
 !                         (integer             ncerr)
       external       nf_strerror
 

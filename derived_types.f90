@@ -97,10 +97,10 @@ MODULE DTYPES_module
   END TYPE ANALYSISGRID
   
   TYPE FORAY_DATA
-    character*8              :: name
+    character(len=8)              :: name
     integer                  :: nazimuths, ngates
     real, allocatable        :: az(:), field(:,:), el(:), range(:)
-    integer*8, allocatable   :: time(:)
+    integer(kind=8), allocatable   :: time(:)
     integer                  :: missing
     integer                  :: year, month, day, hour, minute, second
     real                     :: latitude, longitude, height

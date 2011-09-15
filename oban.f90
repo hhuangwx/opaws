@@ -735,7 +735,7 @@ CONTAINS
     integer(kind=2), parameter :: cms=0.0
     real range                      ! distance from radar to gate (km)
     real datamax, datamin
-    integer*8 :: storage = 0, good_gates, status
+    integer(kind=8) :: storage = 0, good_gates, status
     logical, allocatable :: threshold(:,:)
     integer year, month, day, hour, minute, second
     integer(kind=4) cjd             ! central julian day
@@ -1036,11 +1036,11 @@ CONTAINS
           IF( minrange .gt. 0.01 ) THEN
             DO r = 1,swib%num_rays
               DO g = 1,celv%total_gates
-				range = rangekm_to_gate(celv, g)
+                range = rangekm_to_gate(celv, g)
                 IF( range  .lt. minrange ) threshold(g,r) = .true.
               ENDDO
             ENDDO
-		  ENDIF
+          ENDIF
 
           IF( pre_oban_filter_flag(n) .ne. 0 ) THEN
 
@@ -1198,7 +1198,7 @@ CONTAINS
     real                 :: ti                      ! time (s) relative to central time
     real                 :: timediff4               ! functions used by this subroutine
     real                 :: datamax, datamin
-    integer*8            :: storage = 0, good_gates, offset
+    integer(kind=8)      :: storage = 0, good_gates, offset
     logical, allocatable :: threshold(:,:)
 
 ! Store the netcdf in this derived type
@@ -1378,7 +1378,7 @@ CONTAINS
                 IF( fdata%range(g) .lt. minrange ) threshold(g,r) = .true.
               ENDDO
             ENDDO
-		  ENDIF
+          ENDIF
 
 ! DCD 11/26/10
           IF( pre_oban_filter_flag(n) .ne. 0 ) THEN
@@ -1464,7 +1464,7 @@ CONTAINS
           write(6,*) "NSWP = ", s
           write(6,*) "Total MBytes allocated so far:  ", float(40*storage)/1.e6
           write(6,*) "Requested storage for this sweep:  ", float(40*good_gates)/1.0e6
-          write(6,*), "Sorry, have to stop program!"
+          write(6,*) "Sorry, have to stop program!"
           write(6,*) 
           stop
         ELSE 
@@ -1591,10 +1591,10 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
   
   integer   :: az_dimid, g_dimid
   integer   :: naz, ngates, cell_space_method
-  integer*8 :: int_volume_start_time
+  integer(kind=8) :: int_volume_start_time
   integer   :: r, g
   real      :: range_to_first_cell, datamin, datamax
-  integer*2, allocatable :: field(:,:)
+  integer(kind=2), allocatable :: field(:,:)
 
   character (len = 255) :: name
 
@@ -1608,7 +1608,7 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
   status = NF90_OPEN(trim(filename), nf90_nowrite, ncid)
   
   IF (status /= NF90_NOERR) then
-    write(6,*), 'WRITE_main:  PROBLEM OPENING NETCDF FILE ', NF90_STRERROR(status)
+    write(6,*) 'WRITE_main:  PROBLEM OPENING NETCDF FILE ', NF90_STRERROR(status)
     write(6,*) 'WRITE_main:  Filename = ', filename
     write(6,*) 'WRITE_main:  NCID = ', ncid
   ENDIF
@@ -1780,7 +1780,7 @@ CONTAINS
     
     IF( status /= nf90_noerr ) THEN 
       IF( present(message) ) THEN
-        write(6,*), message//"  "//trim(nf90_strerror(status))
+        write(6,*) message//"  "//trim(nf90_strerror(status))
         stop "Stopped"
       ELSE
         write(6,*) trim(nf90_strerror(status))

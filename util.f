@@ -2779,13 +2779,14 @@ c############################################################################
       integer   :: year, month, day, hour, minute, second
 
 !---- passed variables
-      integer*8 :: offset                   ! offset, in seconds of input 
+      integer(kind=8) :: offset                   ! offset, in seconds of input 
 
 !---- local variables
       integer   :: prev
-      integer*8 :: sec_offset, min_offset, hour_offset, day_offset
+      integer(kind=8) :: sec_offset, min_offset, hour_offset, day_offset
       logical   :: leap
       integer   :: days_this_month, days_per_month(12) = (/31,28,31,30,31,30,31,31,30,31,30,31/)
+      integer(kind=8), parameter :: long_sec = 60, long_day = 24
 
 
       sec_offset = offset
@@ -2794,7 +2795,7 @@ c############################################################################
 !      print*, 'sec_offset before = ', sec_offset
 
       prev = second
-      second = modulo( (second + sec_offset), 60 )
+      second = modulo( (second + sec_offset), long_sec )
       sec_offset = sec_offset + prev - second
 
 !      print*, 'second after = ', second
@@ -2806,7 +2807,7 @@ c############################################################################
 !      print*, 'min_offset before = ', min_offset
 
       prev = minute
-      minute = modulo( (minute + min_offset), 60 )
+      minute = modulo( (minute + min_offset), long_sec )
       min_offset = min_offset + prev - minute
 
 !      print*, 'minute after = ', minute
@@ -2818,7 +2819,7 @@ c############################################################################
 !      print*, 'hour_offset before = ', hour_offset
 
       prev = hour
-      hour = modulo( (hour + hour_offset), 24 )
+      hour = modulo( (hour + hour_offset), long_day )
       hour_offset = hour_offset + prev - hour
 
 !      print*, 'hour after = ', hour

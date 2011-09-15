@@ -244,7 +244,7 @@ MODULE OBAN_PARAMETERS
                                                 !   an objectively-analyzed observation
   logical :: allow_extrapolation = .true.       ! should extrapolation be allowed?
                                                 !   .true. for standard objective analysis, .false. for interpolation only
-
+                                                !
   integer :: radar_data_format = i_missing      ! format for input radar data:
                                                 !   1 == dorade sweep files
                                                 !   2 == netcdf (FORAY)
@@ -317,12 +317,12 @@ MODULE OBAN_PARAMETERS
                           vsp0,                  &
                           gamma,                 &
                           npass,                 &
+                          radar_data_format,     &
                           height_max,            &
                           minrange,              &
                           mincount,              &
                           minsum,                &
                           allow_extrapolation,   &
-                          radar_data_format,     &
                           nfld,                  &
                           nswp
 
@@ -563,7 +563,7 @@ MODULE NAMELIST_MODULE
         read(15,NML=fields,iostat=istat)
         READ_NAMELIST = .true.
         IF ( istat .ne. 0 ) THEN
-          write(0,'("Problem reading namelist: ",a, "Error:  ", i10)'), namelist, istat
+          write(0,'("Problem reading namelist: ",a, "Error:  ", i10)') namelist, istat
           READ_NAMELIST = .false.
         ENDIF
         CALL OBAN_FIELDS_INIT()
@@ -572,7 +572,7 @@ MODULE NAMELIST_MODULE
         read(15,NML=parameters,iostat=istat)
         READ_NAMELIST = .true.
         IF ( istat .ne. 0 ) THEN
-          write(0,'("Problem reading namelist: ",a, "Error:  ", i10)'), namelist, istat
+          write(0,'("Problem reading namelist: ",a, "Error:  ", i10)') namelist, istat
           READ_NAMELIST = .false.
         ENDIF
         CALL OBAN_PARAMETERS_INIT()
@@ -866,7 +866,7 @@ MODULE CS_NAMELIST_MODULE
         read(15,NML=clutter_stat_params,iostat=istat)
         READ_NAMELIST = .true.
         IF ( istat .ne. 0 ) THEN
-          write(0,'("Problem reading namelist: ",a, "Error:  ", i10)'), namelist, istat
+          write(0,'("Problem reading namelist: ",a, "Error:  ", i10)') namelist, istat
           READ_NAMELIST = .false.
         ENDIF
         CALL CS_PARAMETERS_INIT()
