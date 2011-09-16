@@ -19,7 +19,7 @@ output_format = "png"
 # ADD the name of the variables you want plotted here.
 #
 ref_variables = ["DBZ", "DZ"]
-#vr_variables  = ["DV", "VE", "VR", "VEL", "VU"]
+vr_variables  = ["DV", "VE", "VR", "VEL", "VU"]
 
 hscale = 1.0 / 1000.
 
@@ -82,7 +82,7 @@ def create_html(directory,files):
     html_file.close()
     return
 
-def plotoban(ref, x, y, elevation, az, time, pass_no=1, directory=None):
+def plotoban(variable, ref, x, y, elevation, az, time, pass_no=1, directory=None):
 
     filename = "%s/%s_%4.2f_pass_%d.png" % ("./"+directory,str.replace(time.isoformat(),"T","_"), elevation, pass_no)
                
@@ -93,19 +93,26 @@ def plotoban(ref, x, y, elevation, az, time, pass_no=1, directory=None):
     P.axes().set_aspect('equal')
 
     plt = P.subplot(111)
-    clevels = N.arange(0,75,5)
-    plt = P.contourf(x, y, ref, clevels, cmap=ctables.NWSRef)
-    cbar = P.colorbar(plt)
-    cbar.ax.set_ylabel('dBZ')
+
+    if variable == "DBZ":
+        clevels = N.arange(0,75,5)
+        plt = P.contourf(x, y, ref, clevels, cmap=ctables.NWSRef)
+        cbar = P.colorbar(plt)
+        cbar.ax.set_ylabel('dBZ')
+        P.title("DBZ Analysis / %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation, pass_no))
+
+    if variable == "VR":
+        clevels = N.arange(-30,35,5)
+        plt = P.contourf(x, y, ref, clevels, cmap=ctables.Not_PosDef_Default)
+        cbar = P.colorbar(plt)
+        cbar.ax.set_ylabel('Vr m/s')
+        P.title("Vr Analysis /  %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation,pass_no))
+
     P.xlabel('X (km)')
     P.ylabel('Y (km)')
     P.ylim(y.min(), y.max())
     P.xlim(x.min(), x.max())
-    P.title("DBZ Analysis / %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation, pass_no))
     
-    P.xlabel('X (km)')
-    P.ylabel('Y (km)')
-
     if output_format == "png": 
         print "\n Saving file %s" % (filename)
         P.savefig(filename, format="png")
@@ -116,7 +123,7 @@ def plotoban(ref, x, y, elevation, az, time, pass_no=1, directory=None):
 
     return filename
 
-def plotoban_gis(ref, x, y, elevation, az, time, pass_no=1, directory=None, lat=None, lon=None):
+def plotoban_gis(variable, ref, x, y, elevation, az, time, pass_no=1, directory=None, lat=None, lon=None):
 
     filename = "%s/%s_%4.2f_pass_%d.png" % ("./"+directory,str.replace(time.isoformat(),"T","_"), elevation, pass_no)
                
@@ -128,16 +135,30 @@ def plotoban_gis(ref, x, y, elevation, az, time, pass_no=1, directory=None, lat=
     ymax = max(y)
     ymin = min(y)
 
-    clevels = N.arange(0,75,5)
-    plot    = ax.contourf(x, y, ref, clevels, cmap=ctables.NWSRef)
-    axins   = inset_axes(ax, width="5%", height="35%", loc=3)
-    locator = axins.get_axes_locator()
-    locator.set_bbox_to_anchor((1.05, 0.05, 1, 1), ax.transAxes)
-    locator.borderpad = 0.
-    cbar    = fig.colorbar(plot, cax=axins)
+    if variable == "DBZ":
+        clevels = N.arange(0,75,5)
+        plot    = ax.contourf(x, y, ref, clevels, cmap=ctables.NWSRef)
+        axins   = inset_axes(ax, width="2%", height="35%", loc=3)
+        locator = axins.get_axes_locator()
+        locator.set_bbox_to_anchor((1.05, 0.05, 1, 1), ax.transAxes)
+        locator.borderpad = 0.
+        cbar = fig.colorbar(plot, cax=axins)
+        cbar.ax.set_ylabel('dBZ')
+        ax.set_title("DBZ Analysis / %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation, pass_no),ha='center')
+
+    if variable == "VR":
+        clevels = N.arange(-30,35,5)
+        plot = ax.contourf(x, y, ref, clevels, cmap=ctables.Not_PosDef_Default)
+        axins   = inset_axes(ax, width="2%", height="35%", loc=3)
+        locator = axins.get_axes_locator()
+        locator.set_bbox_to_anchor((1.05, 0.05, 1, 1), ax.transAxes)
+        locator.borderpad = 0.
+        cbar = fig.colorbar(plot, cax=axins)
+        cbar.ax.set_ylabel('Vr m/s')
+        ax.set_title("Vr Analysis /  %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation,pass_no))
+
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
-    ax.set_title("DBZ Analysis / %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation, pass_no),ha='right')
 
     sw_lat, sw_lon = dxy_2_ll(xmin/hscale,ymin/hscale,N.deg2rad(lat),N.deg2rad(lon))
     ne_lat, ne_lon = dxy_2_ll(xmax/hscale,ymax/hscale,N.deg2rad(lat),N.deg2rad(lon))
@@ -208,6 +229,9 @@ def main(argv=None):
     parser.add_option("-g", "--gis",  dest="gis", default=False, \
                                       help = "Boolean flag to use GIS environment variable default==False", action="store_true")
 
+    parser.add_option("-v", "--variable",  dest="variable", default=False, \
+                                      help = "Name of field to plot, currently VR or DBZ are valid names")
+
     (options, args) = parser.parse_args()
 
     if options.file == None:
@@ -215,6 +239,14 @@ def main(argv=None):
         parser.print_help()
         print
         sys.exit(1)
+    
+    if options.variable == None:
+        print
+        print "==============>  No variable specified, defaulting to VR"
+        print
+        variable = "VR"
+    else:
+        variable = options.variable
     
     if options.dir == None:
         options.dir = "obanplots"
@@ -240,29 +272,55 @@ def main(argv=None):
 
 # Here try and read in reflectivity data
 #
-    for item in ref_variables:
+    if variable.upper() == "DBZ":
+        for item in ref_variables:
+            try:
+                d = ncdf_file.variables[item][:]
+                print "\n ===> Read variable ", item
+            except:
+                print "\n Cannot find variable ", item
+
         try:
-            d = ncdf_file.variables[item][:]
-            print "\n ===> Read variable ", item
-        except:
-            print "\n Cannot find variable ", item
+           print "Shape of reflectivity field:  ", d.shape
+        except UnboundLocalError:
+           print
+           print "**** !!!!ERROR!!!! ****"
+           print
+           print "No valid Reflectivity field found"
+           print "PlotOban looked for the following fields:  ", ref_variables
+           print
+           print "netCDF file has the following variables:  \n" 
+           for item in ncdf_file.variables.keys():  print item 
+           print
+           print "Please add the name of the file's reflectivity field to the list of ref_variables at top of the PlotOban script"
+           print
+           sys.exit(1)
+ 
+# Here try and read in velocity data
+#
+    if variable.upper() == "VR":
+        for item in vr_variables:
+            try:
+                d = ncdf_file.variables[item][:]
+                print "\n ===> Read variable ", item
+            except:
+                print "\n Cannot find variable ", item
 
-    try:
-       print "Shape of reflectivity field:  ", d.shape
-    except UnboundLocalError:
-       print
-       print "**** !!!!ERROR!!!! ****"
-       print
-       print "No valid Reflectivity field found"
-       print "PlotOban looked for the following fields:  ", ref_variables
-       print
-       print "netCDF file has the following variables:  \n" 
-       for item in ncdf_file.variables.keys():  print item 
-       print
-       print "Please add the name of the file's reflectivity field to the list of ref_variables at top of the PlotOban script"
-       print
-       sys.exit(1)
-
+        try:
+           print "Shape of radial velocity field:  ", d.shape
+        except UnboundLocalError:
+           print
+           print "**** !!!!ERROR!!!! ****"
+           print
+           print "No valid radial velocity field found"
+           print "PlotOban looked for the following fields:  ", vr_variables
+           print
+           print "netCDF file has the following variables:  \n" 
+           for item in ncdf_file.variables.keys():  print item 
+           print
+           print "Please add the name of the file's radial velocity field to the list of ref_variables at top of the PlotOban script"
+           print
+           sys.exit(1)
 
 # Here read in other data needed for plotting - note failure is not an option!
 #
@@ -279,9 +337,6 @@ def main(argv=None):
         if item == "TIME":  ti = q.copy()
         if item == "x":     x  = q.copy()
         if item == "y":     y  = q.copy()
-
-    print x
-    
 
     del(q)  # releasing some memory
     
@@ -312,11 +367,11 @@ def main(argv=None):
                               (k,el[0,k,:,:].mean(), sec_utime.num2date(ti[0,k,:,:].mean()))
 
             if options.gis:
-              files.append(plotoban_gis(d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
+              files.append(plotoban_gis(variable,d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
                            sec_utime.num2date(ti[0,k].mean()), pass_no = p+1, directory = options.dir, \
                            lat=ncdf_file.variables['grid_latitude'][0], lon=ncdf_file.variables['grid_longitude'][0]))
             else:
-              files.append(plotoban(d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
+              files.append(plotoban(variable,d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
                            sec_utime.num2date(ti[0,k].mean()), pass_no = p+1, directory = options.dir))
         
 # Now create the html file for looking at the data
