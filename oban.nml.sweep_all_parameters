@@ -66,28 +66,16 @@
    gamma = 0.3,                       ! gamma parameter for multi-pass Barnes analysis
    npass = 1,                         ! number of passes
                                       !
-                                      ! The following 7 parameters affect the implementation of the Steiner and Smith (2002,
-                                      !   J. Atmos. Oceanic Technol.) algorithm for removing echoes not associated with precipitation.
-   remove_gc_refl_thresh = .false.    ! true. if ground clutter should be removed based on reflectivity threshold
-   remove_gc_echo_top = .false.       ! true. if ground clutter should be removed based on echo top
-   refl_thresh = 5.0                  ! reflectivity threshold (dBZ) for first two steps in Steiner and Smith (2002) algorithm
-   remove_gc_spin_change = .false.    ! true. if ground clutter should be removed based on spin change
-   refl_fluc = 2.0                    ! reflectivity fluctuation (dBZ) for spin-change portion of algorithm
-   remove_gc_vert_grad = .false.      ! true. if ground clutter should be removed based on vertical gradient
-   grad_thresh = 10.0                 ! reflectivity gradient (dBZ/degree) for vertical-gradient portion of algorithm
-                                      !
-   use_clutter_mask = .false.         ! .true. if clutter mask based on ppi stats should be implemented
-   cm_min_refl_avail = 75.0           ! minimum reflectivity availability (%) for clutter mask
-   cm_min_refl = -5.0                 ! minimum reflectivity (dBZ) for clutter mask
-   cm_max_refl_sd = 10.0              ! maximum reflectivity standard deviation (dBZ) for clutter mask
-   cm_refl_exceedance = 20.0          ! reflectivity exceedance (dBZ) for which standard clutter mask is ignored
-   cm_min_vel_sd = 7.5                ! minimum velocity standard deviation (m/s) for highway detection in clutter mask
-   cm_max_vel = 2.0                   ! maximum velocity absolute magnitude (m/s) for standard clutter detection in clutter mask
-   cm_max_vel_sd = 2.0                ! maximum velocity standard deviation (m/s) for standard clutter detection in clutter mask
-   cm_ncfile = ""                     ! netcdf "ppi stats" file name for clutter masking
-   cm_refl_fname = "REF"              ! name of reflectivity field in current analysis
-   cm_refl_fname_ppi = "REF"          ! name of reflectivity field in "ppi stats" file
-   cm_vel_fname_ppi = "VEL"           ! name of velocity field in "ppi stats" file
+   cm_use_clutter_mask = .false.      ! .true. if clutter mask produced by clutter_stats should be implemented
+   cm_min_fixed_clutter_freq = 0.70   ! minimum frequency (0.0 - 1.0) of fixed clutter from clutter_stats that will be considered clutter
+   cm_min_moving_clutter_freq = 1.01  ! minimum frequency (0.0 - 1.0) of moving clutter from clutter_stats that will be considered clutter
+   cm_halo = 0                        ! number of additional neighboring bins in each direction to search for maximum in clutter frequency
+   cm_use_refl_test = .false.         ! .true. if clutter masking should be conditional on difference between observed and mean reflectivity 
+   cm_refl_fname = ""                 ! name of reflectivity field in input radar data
+   cm_refl_exceedance = 20.0          ! reflectivity exceedance above mean (dBZ) for which clutter mask is ignored
+   cm_min_obs = 1                     ! minimum number of observations for identifying clutter
+   cm_min_sweeps = 1                  ! minimum number of sweeps for identifying clutter
+   cm_ncfile = ""                     ! netcdf file that contains clutter-mask information (output from clutter_stats)
                                       !
    use_clear_air_type = .false.       ! .true. if clear-air reflectivity ob. type should be used for DART output
    clear_air_skip = 0                 ! thinning factor for clear-air reflectivity data
