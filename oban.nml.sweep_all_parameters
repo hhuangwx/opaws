@@ -91,6 +91,10 @@
    allow_extrapolation = .true.       ! should extrapolation be allowed?
                                       !   .true. for standard objective analysis, .false. for interpolation only
                                       !
+   remove_sector = .false.            ! remove a sector of the data -> useful for blending MPAR quadrants with KOUN
+   remove_sector_begin = 350.0        ! starting azimuth angle (deg) for removing a sector
+   remove_sector_end   = 10.0         ! ending azimuth angle (deg) for removing a sector
+                                      !
    radar_data_format = 1,             ! radar data format: 1=dorade sweep files, 2=netcdf (FORAY)
                                       !
    nfld = 2,                          ! number of data fields to be gridded
