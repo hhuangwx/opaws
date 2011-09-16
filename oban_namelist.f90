@@ -246,8 +246,8 @@ MODULE OBAN_PARAMETERS
                                                 !   .true. for standard objective analysis, .false. for interpolation only
 
   logical :: remove_sector = .false.            ! remove a sector of the data -> useful for blending MPAR quadrants with KOUN
-  integer :: remove_sector_begin = -1
-  integer :: remove_sector_end   = -1
+  real    :: remove_sector_begin = r_missing    ! starting azimuth angle (deg) for removing a sector
+  real    :: remove_sector_end   = r_missing    ! ending azimuth angle (deg) for removing a sector
 
   integer :: radar_data_format = i_missing      ! format for input radar data:
                                                 !   1 == dorade sweep files
@@ -404,8 +404,8 @@ MODULE OBAN_PARAMETERS
      CALL DICT_CREATE( "Min sum ",            flt=minsum )
      CALL DICT_CREATE( "Extrapolate flag ",   log=allow_extrapolation )
      CALL DICT_CREATE( "Remove Sector ",      log=remove_sector )
-     CALL DICT_CREATE( "Remove Sector Starting Azimuth", int=remove_sector_begin )
-     CALL DICT_CREATE( "Remove Sector Ending Azimuth", int=remove_sector_end )
+     CALL DICT_CREATE( "Remove Sector Starting Azimuth", flt=remove_sector_begin )
+     CALL DICT_CREATE( "Remove Sector Ending Azimuth", flt=remove_sector_end )
      CALL DICT_CREATE( "Radar data format",   int=radar_data_format )
      CALL DICT_CREATE( "No. of radar fields", int=nfld )
      CALL DICT_CREATE( "No. of files",        int=nswp )
@@ -676,10 +676,10 @@ MODULE NAMELIST_MODULE
     IF ( nfld .le. 0) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'nfld')
 
     IF ( (nswp .eq. 0) .or. (nswp .lt. -1) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'nswp')
-    IF ( remove_sector .and. (remove_sector_begin .eq. -1 .or. remove_sector_end   .eq. -1 ) ) &
+    IF ( remove_sector .and. (remove_sector_begin .eq. r_missing .or. remove_sector_end .eq. r_missing ) ) &
                            CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'Remove sector input error')
-    IF ( .not. remove_sector .and. (remove_sector_begin .ne. -1 .or. remove_sector_end   .ne. -1 ) ) &
-                           CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'Remove sector input error')
+!    IF ( .not. remove_sector .and. (remove_sector_begin .ne. r_missing .or. remove_sector_end   .ne. r_missing ) ) &
+!                           CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'Remove sector input error')
 
     DO f = 1, nfld
       IF ( (fill_flag(f) .ne. 0) .and. (fill_flag(f) .ne. 1) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'fill_flag')
