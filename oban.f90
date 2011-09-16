@@ -622,6 +622,47 @@ PROGRAM OBAN
 
 !############################################################################
 !
+!    Chop out regions where you want to combine data sets (useful with MPAR)
+!
+!############################################################################
+
+  IF( remove_sector ) THEN
+
+    DO nf = 1,nfld
+
+      write(6,*)
+      write(6,*) 'Field:  ',vol%sweep%field(nf)%name, ' is having sector removed'
+
+      IF( remove_sector_begin .lt. remove_sector_end ) THEN
+
+        DO k = 1,nz
+          DO j = 1,ny
+            DO i = 1,nx
+              IF( anal%az(i,j,k) .gt. float(remove_sector_begin) .and. &    ! Notice the .AND. here....
+                  anal%az(i,j,k) .lt. float(remove_sector_end)  ) anal%f(i,j,k,nf,1:npass) = sbad
+            ENDDO
+          ENDDO
+        ENDDO
+
+      ELSE  ! here we change the logic when remove_sector_end < remove_sector_begin so that we can remove the extruded area
+
+        DO k = 1,nz
+          DO j = 1,ny
+            DO i = 1,nx
+              IF( anal%az(i,j,k) .gt. float(remove_sector_begin) .or. &      ! Notice the .OR. here....
+                  anal%az(i,j,k) .lt. float(remove_sector_end)  ) anal%f(i,j,k,nf,1:npass) = sbad
+            ENDDO
+          ENDDO
+        ENDDO
+
+      ENDIF
+
+    ENDDO
+
+  ENDIF
+
+!############################################################################
+!
 !     Output the results.
 !
 !############################################################################
@@ -1613,14 +1654,14 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
     write(6,*) 'WRITE_main:  NCID = ', ncid
   ENDIF
   
-  call check( nf90_get_att(ncid, nf90_global, "Volume_Start_Time", volume_start_time) )
-  call check( nf90_get_att(ncid, nf90_global, "Instrument_Name",   instrument_name) )
-  call check( nf90_get_att(ncid, nf90_global, "Year",   fdata%year) )
-  call check( nf90_get_att(ncid, nf90_global, "Month",  fdata%month) )
-  call check( nf90_get_att(ncid, nf90_global, "Day",    fdata%day) )
-  call check( nf90_get_att(ncid, nf90_global, "Hour",   fdata%hour) )
-  call check( nf90_get_att(ncid, nf90_global, "Minute", fdata%minute) )
-  call check( nf90_get_att(ncid, nf90_global, "Second", fdata%second) )
+  call check( nf90_get_att(ncid, nf90_global, "Volume_Start_Time", volume_start_time), message='Vol_Start_Time' )
+  call check( nf90_get_att(ncid, nf90_global, "Instrument_Name",   instrument_name), message='Instrument Name')
+  call check( nf90_get_att(ncid, nf90_global, "Year",   fdata%year), message='Attribute: Year')
+  call check( nf90_get_att(ncid, nf90_global, "Month",  fdata%month), message='Attribute: Month')
+  call check( nf90_get_att(ncid, nf90_global, "Day",    fdata%day), message='Attribute:  Day')
+  call check( nf90_get_att(ncid, nf90_global, "Hour",   fdata%hour), message='Attribute:  Hour')
+  call check( nf90_get_att(ncid, nf90_global, "Minute", fdata%minute), message='Attribute:  Minute')
+  call check( nf90_get_att(ncid, nf90_global, "Second", fdata%second), message='Attribute: Second')
 
 !-----
 ! Get the actual number of rays in the sweep
@@ -1631,8 +1672,8 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
 !-----
 ! Get the actual number of rays in the sweep
 
-  call check ( nf90_inq_dimid(ncid, AZ_DIM, az_dimid) )
-  call check ( nf90_inquire_dimension(ncid, az_dimid, name, naz) )
+  call check ( nf90_inq_dimid(ncid, AZ_DIM, az_dimid),  message='Getting Azimuth dimension ID' )
+  call check ( nf90_inquire_dimension(ncid, az_dimid, name, naz),  message='Getting Azimuth dimension')
   
 ! allocate space for aziumth variable
 
@@ -1774,17 +1815,26 @@ SUBROUTINE READ_FORAY(filename, field_name, fdata)
   
 CONTAINS
 
-  SUBROUTINE CHECK(status, message)
+  SUBROUTINE CHECK(status, message, continue)
     integer, intent (in) :: status
     character(len=*), optional :: message
+    logical, optional :: continue
     
     IF( status /= nf90_noerr ) THEN 
       IF( present(message) ) THEN
         write(6,*) message//"  "//trim(nf90_strerror(status))
-        stop "Stopped"
+        IF( present(continue) ) THEN
+          return
+        ELSE
+          stop "Stopped"
+        ENDIF
       ELSE
         write(6,*) trim(nf90_strerror(status))
-        stop "Stopped"
+        IF( present(continue) ) THEN
+          return
+        ELSE
+          stop "Stopped"
+        ENDIF
       ENDIF
     END IF
 
