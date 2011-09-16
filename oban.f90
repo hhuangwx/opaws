@@ -638,8 +638,8 @@ PROGRAM OBAN
         DO k = 1,nz
           DO j = 1,ny
             DO i = 1,nx
-              IF( anal%az(i,j,k) .gt. float(remove_sector_begin) .and. &    ! Notice the .AND. here....
-                  anal%az(i,j,k) .lt. float(remove_sector_end)  ) anal%f(i,j,k,nf,1:npass) = sbad
+              IF( anal%az(i,j,k) .gt. remove_sector_begin .and. &    ! Notice the .AND. here....
+                  anal%az(i,j,k) .lt. remove_sector_end  ) anal%f(i,j,k,nf,1:npass) = sbad
             ENDDO
           ENDDO
         ENDDO
@@ -649,8 +649,8 @@ PROGRAM OBAN
         DO k = 1,nz
           DO j = 1,ny
             DO i = 1,nx
-              IF( anal%az(i,j,k) .gt. float(remove_sector_begin) .or. &      ! Notice the .OR. here....
-                  anal%az(i,j,k) .lt. float(remove_sector_end)  ) anal%f(i,j,k,nf,1:npass) = sbad
+              IF( anal%az(i,j,k) .gt. remove_sector_begin .or. &      ! Notice the .OR. here....
+                  anal%az(i,j,k) .lt. remove_sector_end  ) anal%f(i,j,k,nf,1:npass) = sbad
             ENDDO
           ENDDO
         ENDDO
