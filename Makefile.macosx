@@ -43,21 +43,29 @@ CFLAGS = -m32 -c -g -I. -DLONG32 -DUNDERSCORE -DLITTLE
 # Leave this stuff alone
 
 EXEC = x.oban
+EXECcs = x.clutter_stats
 
 OBJS = DART.o oban_module.o dict_module.o oban_namelist.o derived_types.o util.o fileio.o read_dorade.o binio.o v5d.o 
+OBJScs = DART.o dict_module.o oban_namelist.o derived_types.o fileio.o util.o read_dorade.o binio.o v5d.o
 
-default: $(EXEC)
+default: $(EXEC) $(EXECcs)
 
 $(EXEC): $(OBJS) oban.o
 	$(FC) $(OPT) -o $(EXEC) oban.o $(OBJS) $(NETCDFLIB)
 
+$(EXECcs): $(OBJScs) clutter_stats.o
+	$(FC) $(OPT) -o $(EXECcs) clutter_stats.o $(OBJScs) $(NETCDFLIB)
+
 clean:
-	rm $(EXEC) oban.o $(OBJS) *.mod ncgen.input *.pyc sweep_file_list.txt
+	rm $(EXEC) oban.o $(OBJS) $(EXECcs) clutter_stats.o $(OBJScs) *.mod ncgen.input *.pyc sweep_file_list.txt
 
 # Individual compilation instructions
 
 oban.o: oban.f90 structures.inc opaws.inc DART.o
 	$(FC) $(OPT) -c $(NETCDFINC) oban.f90
+
+clutter_stats.o: clutter_stats.f90 opaws.inc
+	$(FC) $(OPT) -c $(NETCDFINC) clutter_stats.f90
 
 oban_module.o: oban_module.f90 derived_types.o opaws.inc
 	$(FC) $(OPT) -c oban_module.f90
