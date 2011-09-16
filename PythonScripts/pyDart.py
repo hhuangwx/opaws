@@ -12,17 +12,20 @@ import pylab as P
 import numpy as N
 import time
 
-debug                = False
+debug                = True
 missing              = -999.
 version_string       = "pyDART_file_version_2.1"
 checked_file_version = False
 hscale               = 1./1000.  # horizontal scale for plotting
 
-radar_lat            =  35.235832                     # KOUN/PAR location
-radar_lon            = -97.461945                     # KOUN/PAR location
-
 radar_lat            =  35.4976                       # SR2 lat 30 May 2004 / 0000Z
 radar_lon            = -98.4654                       # SR2 lon 30 May 2004 / 0000Z
+
+radar_lat            =  35.33331                      # KTLX
+radar_lon            = -97.27777                      # KTLX
+
+radar_lat            =  35.235832                     # KOUN/PAR location
+radar_lon            = -97.461945                     # KOUN/PAR location
 
 day_utime = utime("days since 1601-01-01 00:00:00")
 sec_utime = utime("seconds since 1970-01-01 00:00:00")
@@ -168,6 +171,7 @@ def ObType_LookUp(name,DART_name=False,Print_Table=False):
 
       Look_Up_Table={ "DOPPLER_VELOCITY":                 [11,   "DOPPLER_VELOCITY"] ,
                       "REFLECTIVITY":                     [12,   "REFLECTIVITY"],
+                      "RADAR_CLEARAIR_REFLECTIVITY":      [13,   "RADAR_CLEARAIR_REFLECTIVITY"],  
                       "DIFFERENTIAL_REFLECTIVITY":        [300,  "DIFFERENTIAL_REFLECTIVITY"],
                       "SPECIFIC_DIFFERENTIAL_PHASE":      [301,  "SPECIFIC_DIFFERENTIAL_PHASE"],
                       "METAR_U_10_METER_WIND":            [1,    "METAR_U_10_METER_WIND"],
@@ -177,6 +181,7 @@ def ObType_LookUp(name,DART_name=False,Print_Table=False):
                       "METAR_SPECIFIC_HUMIDITY_2_METER":  [5,    "METAR_SPECIFIC_HUMIDITY_2_METER"],
                       "VR":                               [11,   "DOPPLER_VELOCITY"],
                       "DBZ":                              [12,   "REFLECTIVITY"],
+                      "0DBZ":                             [13,   "RADAR_CLEARAIR_REFLECTIVITY"],
                       "ZDR":                              [300,  "DIFFERENTIAL_REFLECTIVITY"],
                       "KDP":                              [301,  "SPECIFIC_DIFFERENTIAL_PHASE"],
                       "U10M":                             [1,    "METAR_U_10_METER_WIND"],
@@ -381,7 +386,7 @@ class pyDART():
 #      (see http://sourceforge.net/project/showfiles.php?group_id=80706&package_id=142792)
         
         xy = data['x'].copy() + (0.+1.j)*data['y'].copy()
-        xy_unique, index = N.unique1d(xy, return_index=True)
+        xy_unique, index = N.unique(xy, return_index=True)
         
         print
         print "Number of points found from initial search:      %d" % (xy.size)
@@ -398,10 +403,10 @@ class pyDART():
         ymean = y.mean()
         del_x = x.max() - x.min()
         del_y = y.max() - y.min()
-        xmin  = N.round(xmean - 0.8*(del_y*del_x / (del_y+del_x)))
-        ymin  = N.round(ymean - 0.8*(del_y*del_x / (del_y+del_x)))
-        xmax  = N.round(xmean + 0.8*(del_y*del_x / (del_y+del_x)))
-        ymax  = N.round(ymean + 0.8*(del_y*del_x / (del_y+del_x)))
+        xmin  = N.round(xmean - (del_y*del_x / (del_y+del_x)))
+        ymin  = N.round(ymean - (del_y*del_x / (del_y+del_x)))
+        xmax  = N.round(xmean + (del_y*del_x / (del_y+del_x)))
+        ymax  = N.round(ymean + (del_y*del_x / (del_y+del_x)))
         
         xi = N.arange(xmin, xmax, dx)
         yi = N.arange(ymin, ymax, dy)
@@ -418,7 +423,7 @@ class pyDART():
 #-------------------------------------------------------------------------------
 # A quick and dirty plotting routine to make sure the pyDART is reasonable
     
-    def plot(self,variable=None, savefig=None):
+    def plot(self, variable=None, savefig=None):
 
 # define a quick and dirty colormap for reflectivity
         
@@ -454,7 +459,6 @@ class pyDART():
         if variable.upper() == "DBZ" or variable.upper() == "REFLECTIVITY":
             clevels = N.arange(0,75,5)
             plt = P.contourf(xi,yi,zi, clevels, colors=cmap)
-#           plt = P.contourf(xi,yi,zi, clevels, colors=cmap)
             cbar = P.colorbar(plt)
             cbar.ax.set_ylabel('dBZ')
         else:
@@ -696,8 +700,8 @@ class pyDART():
             stuff = stuff.split()
             row['index'] = int(stuff[0])
             row['name']  = stuff[1]
+            print 'Observation kind definitions:  ', row['index'], row['name']
             row.append()
-            if self.debug:  print 'Observation kind definitions:  ', row['index'], row['name']
             n += 1
         
         if self.debug:  print 'Completed reading obs_kind_definitions'
@@ -724,20 +728,18 @@ class pyDART():
             data_storage.append(fi.readline())  # Read(str) how the data is written....e.g., "observations" or "truth"
             
         for numqc in N.arange(num_qc):          # If the num_qc flag is > 0, read the description of the qc flags
-            qc_descrip = fi.readline()
+            data_storage.append(fi.readline())  # 
 
         stuff       = fi.readline()         # Read(str) "first   1   last   No of obs" line
         stuff       = stuff.split()
         first       = long(stuff[1])
         last        = long(stuff[3])
         
-        print table_header
         row = table_header.row
         
         row['origin_file'] = "Original DART observation file is: " + self.ascii + "\n"
         row['num_copies']  = num_copies
         row['num_qc']      = num_qc
-        row['qc_descrip']  = qc_descrip.strip()  # Get rid of blank spaces
         row['num_obs']     = num_obs
         row['max_num_obs'] = max_num_obs
         row['first']       = first
@@ -751,7 +753,6 @@ class pyDART():
             print "Number of QC'd observations:   ", num_qc
             print "Number of observations:        ", num_obs
             print "Max number of observations:    ", max_num_obs
-
 
 # Find the obs group to create table in
         
@@ -776,11 +777,13 @@ class pyDART():
             
             row["number"]    = long(stuff[1])
             
-            for numcp in N.arange(num_copies):      # Now read the observation, and if provided, the truth value
+            for numcp in N.arange(num_copies+num_qc-1):      # Now read the observation, and if provided, the truth value
                 if data_storage[numcp].find("obs") == 0:
                     row["value"]     = read_double_precision_string(fi.readline())
                 elif data_storage[numcp].find("tru") == 0:
                     row["truth"]     = read_double_precision_string(fi.readline())
+                elif data_storage[numcp].find("QC") == 0:
+                    row["qc"]     = read_double_precision_string(fi.readline())
                 else:
                     print "pyDART ascii2hdf:  Problem, data_storage is not 'observations' or 'truth' --> exiting!"
                     print data_storage
@@ -803,7 +806,10 @@ class pyDART():
             row["lon"]        = read_double_precision_string(stuff[0])
             row["lat"]        = read_double_precision_string(stuff[1])
             row["height"]     = read_double_precision_string(stuff[2])
-            row["vert_coord"] = long(fi.readline())
+            if len(stuff) == 4:
+                row["vert_coord"] = long(stuff[3])
+            else:
+                row["vert_coord"] = long(fi.readline())
             
             fi.readline()
             
@@ -811,7 +817,7 @@ class pyDART():
 
 # Check to see if its radial velocity and add platform information...need BETTER CHECK HERE!
             
-            if row["kind"] == 11:
+            if row["kind"] == ObType_LookUp("VR"):
                 
                 fi.readline()
                 fi.readline()
@@ -821,8 +827,10 @@ class pyDART():
                 row['platform_lon']        = read_double_precision_string(stuff[0])
                 row['platform_lat']        = read_double_precision_string(stuff[1])
                 row['platform_height']     = read_double_precision_string(stuff[2])
-                row['platform_vert_coord'] = long(fi.readline())
-                
+                if len(stuff) == 4:
+                    row["platform_vert_coord"] = long(stuff[3])
+                else:
+                    row["platform_vert_coord"] = long(fi.readline())      
                 fi.readline()
                 
                 stuff                    = fi.readline()
@@ -913,10 +921,10 @@ class pyDART():
         
         row = table_ob_kinds.row
         
-        row['index'] = 11
+        row['index'] = ObType_LookUp("DBZ")
         row['name']  = "DOPPLER_RADIAL_VELOCITY" #"VR"
         row.append()
-        row['index'] = 12
+        row['index'] = ObType_LookUp("VR")
         row['name']  = "RADAR_REFLECTIVITY" #"DBZ"
         row.append()
         
@@ -984,7 +992,7 @@ class pyDART():
 
 # Check to see if its radial velocity and add platform information...need BETTER CHECK HERE!
             
-            if row['kind'] == 11:
+            if row['kind'] == ObType_LookUp("VR"):
 
 # Need to switch the lat and lon these around to be correct in version 2 of pyDART...
                 
@@ -1008,7 +1016,7 @@ class pyDART():
                                                            row['platform_dir2'] / N.cos(N.deg2rad(row['elevation'])) ) )
                     if row['azimuth'] < 0: row['azimuth'] = row['azimuth'] + 360.
                     
-            if row['kind'] == 12:    # See if there is information about the azimuth and elevation supplied
+            if row['kind'] == ObType_LookUp("VR"):    # See if there is information about the azimuth and elevation supplied
             
                 if 'azimuth' in obs_dict.keys():
                     row['azimuth'] = obs_dict['azimuth'][n]
@@ -1132,7 +1140,6 @@ class pyDART():
             fi = open(ascii, "w")
 
 # Write out header information
-        
         fi.write(" obs_sequence\n")
         fi.write("obs_kind_definitions\n")
 
@@ -1140,13 +1147,11 @@ class pyDART():
         
         kinds = h5file.root.obs.kinds
         
-#       fi.write("       %d\n" % size(kinds))
-        fi.write("       %d\n" % 2)
+        fi.write("       %d\n" % size(kinds))
 
         for r in kinds.iterrows():
-            if r['index'] == 11 or r['index'] == 12:
-                fi.write("    %d          %s   \n" % (r['index'], r['name']) )
-                if self.debug:  print 'pyDart/hdf2ascii:  Written observational types:  ', r
+            fi.write("    %d          %s   \n" % (r['index'], r['name']) )
+            print 'pyDart/hdf2ascii:  Written observational types:  ', r
         
         attr = h5file.root.header.attributes
         nobs = attr.col('num_obs')[0]
@@ -1155,34 +1160,29 @@ class pyDART():
         
         if self.index != None:
             fi.write(" num_obs:       %d  max_num_obs:       %d\n" % (len(self.index), len(self.index)) )
-            
-            fi.write("observations\n")
-            if attr.col('num_copies')[0] == 2:
-                fi.write("truth\n")
-                
-            fi.write("  first:            %d  last:       %d\n" % (1, len(self.index)) )
-            if self.debug:
-                print "pyDart/hdf2ascii:  Max number of observations:    ", len(self.index)
-        
         else:
             fi.write(" num_obs:       %d  max_num_obs:       %d\n" % (attr.col('num_obs')[0], attr.col('max_num_obs')[0]))
-            
-            fi.write("observations\n")
-            if attr.col('num_copies')[0] == 2:
-                fi.write("truth\n")
-                
-            fi.write("  first:            %d  last:       %d\n" % (attr.col('first')[0], attr.col('last')[0]))
 
-            if self.debug:
-                print "pyDart/hdf2ascii:  Max number of observations:    ", attr.col('max_num_obs')[0]
-
-            if attr.col('num_qc')[0] == 1:
-                fi.write(str(attr.col('qc_descrip')[0]).strip() + "\n")
-        
         if self.debug:
             print "pyDart/hdf2ascii:  Number of observation copies:  ", attr.col('num_copies')[0]
             print "pyDart/hdf2ascii:  Number of QC'd observations:   ", attr.col('num_qc')[0]
-        
+                    
+        fi.write("observations\n")
+        if attr.col('num_copies')[0] == 2:
+            fi.write("truth\n")
+            
+        if attr.col('num_qc')[0] == 1:
+            fi.write("QC\n")
+
+        if self.index != None:
+            fi.write("  first:            %d  last:       %d\n" % (1, len(self.index)))
+            if self.debug:
+               print "pyDart/hdf2ascii:  Max number of observations:    ", len(self.index)
+        else:
+            fi.write("  first:            %d  last:       %d\n" % (attr.col('first')[0], attr.col('last')[0]))
+            if self.debug:
+                print "pyDart/hdf2ascii:  Max number of observations:    ", attr.col('max_num_obs')[0]
+
         if self.debug:  print "pyDart/hdf2ascii:  Completed writing out header information for ascii DART file"
 
 # If there is no search index defined, then create a temporary one to loop through all rows..
@@ -1224,7 +1224,7 @@ class pyDART():
 
 # Check to see if its radial velocity and add platform information...need BETTER CHECK HERE!
             
-            if row["kind"] == 11:
+            if row["kind"] == ObType_LookUp("VR"):
                 
                 fi.write("platform\n")
                 fi.write("loc3d\n")
