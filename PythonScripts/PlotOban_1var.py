@@ -24,6 +24,44 @@ vr_variables  = ["DV", "VE", "VR", "VEL", "VU"]
 hscale = 1.0 / 1000.
 
 #===============================================================================
+def dll_2_dxy(lat1, lat2, lon1, lon2, degrees=True):
+    """dll_2_dxy returns the approximate distance in meters between two lat/lon pairs
+       assuming a flat earth approximation (which is sufficient for radar data)
+
+       INPUTS:  in radians
+
+       if lon2 > lon1: x > 0
+
+       if lat2 > lat1:  y > 0
+
+       OUTPUTS:  DX, DY in meters
+    """
+    rearth = 1000.0 * 6367.0
+
+    if degrees:
+      lon1p = N.deg2rad(lon1)
+      lon2p = N.deg2rad(lon2)
+      lat1p = N.deg2rad(lat1)
+      lat2p = N.deg2rad(lat2)
+    else:
+      lon1p = lon1
+      lon1p = lon2
+      lat1p = lat1
+      lat2p = lat2
+
+
+    if lon1 < 0.0:
+        lon1p = lon1p+2.0*N.pi
+
+    if lon2 < 0.0:
+         lon2p = lon2p+2.0*N.pi
+
+    x = rearth * N.cos(0.5*(lat1p+lat2p)) * (lon2p-lon1p)
+    y = rearth * (lat2p-lat1p)
+
+    return x, y
+
+#===============================================================================
 #
 def dxy_2_ll(x, y, lat1, lon1):
     """dxy_2_ll returns the approximate lat/lon between an x,y coordinate and
@@ -123,7 +161,7 @@ def plotoban(variable, ref, x, y, elevation, az, time, pass_no=1, directory=None
 
     return filename
 
-def plotoban_gis(variable, ref, x, y, elevation, az, time, pass_no=1, directory=None, lat=None, lon=None):
+def plotoban_gis(variable, ref, x, y, elevation, az, time, pass_no=1, directory=None, glat=None, glon=None, rlat=None, rlon=None):
 
     filename = "%s/%s_%4.2f_pass_%d.png" % ("./"+directory,str.replace(time.isoformat(),"T","_"), elevation, pass_no)
                
@@ -157,11 +195,14 @@ def plotoban_gis(variable, ref, x, y, elevation, az, time, pass_no=1, directory=
         cbar.ax.set_ylabel('Vr m/s')
         ax.set_title("Vr Analysis /  %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation,pass_no))
 
+    rdx, rdy = dll_2_dxy(glat, float(rlat), glon, float(rlon), degrees=True)
+    plot3    = ax.plot(rdx*hscale, rdy*hscale, marker='o', color='black',markerfacecolor='black', markersize=10)
+
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
 
-    sw_lat, sw_lon = dxy_2_ll(xmin/hscale,ymin/hscale,N.deg2rad(lat),N.deg2rad(lon))
-    ne_lat, ne_lon = dxy_2_ll(xmax/hscale,ymax/hscale,N.deg2rad(lat),N.deg2rad(lon))
+    sw_lat, sw_lon = dxy_2_ll(xmin/hscale,ymin/hscale,N.deg2rad(glat),N.deg2rad(glon))
+    ne_lat, ne_lon = dxy_2_ll(xmax/hscale,ymax/hscale,N.deg2rad(glat),N.deg2rad(glon))
 
 # First, set the map up on a grid associated with the lat/lon from the model domain
 
@@ -369,7 +410,8 @@ def main(argv=None):
             if options.gis:
               files.append(plotoban_gis(variable,d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
                            sec_utime.num2date(ti[0,k].mean()), pass_no = p+1, directory = options.dir, \
-                           lat=ncdf_file.variables['grid_latitude'][0], lon=ncdf_file.variables['grid_longitude'][0]))
+                           glat=ncdf_file.variables['grid_latitude'][0],  glon=ncdf_file.variables['grid_longitude'][0], \
+                           rlat=ncdf_file.variables['radar_latitude'][0], rlon=ncdf_file.variables['radar_longitude'][0]))
             else:
               files.append(plotoban(variable,d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
                            sec_utime.num2date(ti[0,k].mean()), pass_no = p+1, directory = options.dir))
