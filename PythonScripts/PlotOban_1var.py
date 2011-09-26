@@ -134,7 +134,7 @@ def plotoban(variable, ref, x, y, elevation, az, time, pass_no=1, directory=None
 
     if variable == "DBZ":
         clevels = N.arange(0,75,5)
-        plt = P.contourf(x, y, ref, clevels, cmap=ctables.NWSRef)
+        plt = P.contourf(x, y, ref, clevels, cmap=ctables.REF_default)
         cbar = P.colorbar(plt)
         cbar.ax.set_ylabel('dBZ')
         P.title("DBZ Analysis / %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation, pass_no))
@@ -175,7 +175,7 @@ def plotoban_gis(variable, ref, x, y, elevation, az, time, pass_no=1, directory=
 
     if variable == "DBZ":
         clevels = N.arange(0,75,5)
-        plot    = ax.contourf(x, y, ref, clevels, cmap=ctables.NWSRef)
+        plot    = ax.contourf(x, y, ref, clevels, cmap=ctables.REF_default)
         axins   = inset_axes(ax, width="2%", height="35%", loc=3)
         locator = axins.get_axes_locator()
         locator.set_bbox_to_anchor((1.05, 0.05, 1, 1), ax.transAxes)
