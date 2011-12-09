@@ -232,6 +232,7 @@ MODULE OBAN_PARAMETERS
   integer :: cm_min_sweeps = 1                  ! minimum number of sweeps for identifying clutter
   character(LEN=100) :: cm_ncfile = ""          ! netcdf file that contains clutter-mask information (output from clutter_stats)
 
+  logical :: append_eval = .false.              ! .true. if "_EVAL" should be appended to the names of DART observation types
   logical :: use_clear_air_type = .false.       ! .true. if clear-air reflectivity ob. type should be used for DART output
   integer :: clear_air_skip = 0                 ! thinning factor for clear-air reflectivity data
 
@@ -315,6 +316,7 @@ MODULE OBAN_PARAMETERS
                           cm_min_obs,            &
                           cm_min_sweeps,         &
                           cm_ncfile,             &
+                          append_eval,           &
                           use_clear_air_type,    &
                           clear_air_skip,        &
                           hsp0,                  &
@@ -392,6 +394,7 @@ MODULE OBAN_PARAMETERS
      CALL DICT_CREATE( "Min obs for clutter",              int=cm_min_obs )
      CALL DICT_CREATE( "Min sweeps for clutter",           int=cm_min_sweeps )
      CALL DICT_CREATE( "Clutter stats file name",          str=cm_ncfile )
+     CALL DICT_CREATE( "Append _EVAL to DART ob types", log=append_eval )
      CALL DICT_CREATE( "Use clear air type", log=use_clear_air_type )
      CALL DICT_CREATE( "Clear air skip",     int=clear_air_skip )
      CALL DICT_CREATE( "Horiz. r.o.i. / smoothing param.", flt=hsp0 )
