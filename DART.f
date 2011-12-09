@@ -478,6 +478,63 @@ c############################################################################
 c
 c     ##################################################################
 c     ######                                                      ######
+c     ######             SUBROUTINE write_DART_ob_info            ######
+c     ######                                                      ######
+c     ##################################################################
+c
+c
+c     PURPOSE:
+c
+c     This subroutine outputs the obs_kind and obs_name to the DART header,
+c     with "_EVAL" appended to obs_name if append_eval is .true.
+c
+c############################################################################
+c
+c     Author:  David Dowell
+c
+c     Creation Date:  9 December 2011
+c
+c     Modifications:
+c
+c############################################################################
+
+      subroutine write_DART_ob_info(fi, obs_kind, obs_name, append_eval)
+
+      implicit none
+
+c---- Passed variables
+
+      integer fi                   ! file unit number
+      integer obs_kind
+      character(len=32) obs_name
+      logical append_eval          ! .true. if "_EVAL" should be appended to the names of DART observation types
+
+c---- Local variables
+
+      integer ls                   ! string length
+      integer temp_obs_kind
+      character(len=32) temp_obs_name
+
+      if (append_eval) then
+        temp_obs_kind = obs_kind + 100
+        temp_obs_name = obs_name
+        ls = index(obs_name, ' ') - 1
+        ls = min(ls, 27)
+        temp_obs_name(ls+1:ls+5) = '_EVAL'
+      else
+        temp_obs_kind = obs_kind
+        temp_obs_name = obs_name
+      endif
+      write(fi,*) temp_obs_kind, temp_obs_name
+
+      RETURN
+      END SUBROUTINE write_DART_ob_info
+
+
+c############################################################################
+c
+c     ##################################################################
+c     ######                                                      ######
 c     ######              SUBROUTINE WRITE_DART_HEADER            ######
 c     ######                                                      ######
 c     ##################################################################
@@ -500,13 +557,14 @@ c         19 December 2005 (David Dowell) -- updates for new DART ob format
 c
 c############################################################################
 
-      subroutine write_DART_header(fi, qc_string)
+      subroutine write_DART_header(fi, append_eval, qc_string)
 
       implicit none
 
 c---- Passed variables
 
       integer fi                   ! file unit number
+      logical append_eval          ! .true. if "_EVAL" should be appended to the names of DART observation types
       character(len=129) qc_string
 
 c---- Local variables
@@ -553,17 +611,40 @@ c---- Local variables
       if (use_obs_kind_qv_2m) n = n + 1
 
       write(fi,*) n
-      if (use_obs_kind_Doppler_velocity)      write(fi,*) obs_kind_Doppler_velocity, obs_name_Doppler_velocity
-      if (use_obs_kind_reflectivity)          write(fi,*) obs_kind_reflectivity, obs_name_reflectivity
-      if (use_obs_kind_clearair_reflectivity) write(fi,*) obs_kind_clearair_reflectivity, obs_name_clearair_reflectivity
-      if (use_obs_kind_zdr)                   write(fi,*) obs_kind_zdr, obs_name_zdr
-      if (use_obs_kind_kdp)                   write(fi,*) obs_kind_kdp, obs_name_kdp
-      if (use_obs_kind_u_10m)                 write(fi,*) obs_kind_u_10m, obs_name_u_10m
-      if (use_obs_kind_v_10m)                 write(fi,*) obs_kind_v_10m, obs_name_v_10m
-      if (use_obs_kind_T_2m)                  write(fi,*) obs_kind_T_2m, obs_name_T_2m
-      if (use_obs_kind_THETA_2m)              write(fi,*) obs_kind_THETA_2m, obs_name_THETA_2m
-      if (use_obs_kind_Td_2m)                 write(fi,*) obs_kind_Td_2m, obs_name_Td_2m
-      if (use_obs_kind_qv_2m)                 write(fi,*) obs_kind_qv_2m, obs_name_qv_2m
+
+      if (use_obs_kind_Doppler_velocity) then
+        call write_DART_ob_info(fi, obs_kind_Doppler_velocity, obs_name_Doppler_velocity, append_eval)
+      endif
+      if (use_obs_kind_reflectivity) then
+        call write_DART_ob_info(fi, obs_kind_reflectivity, obs_name_reflectivity, append_eval)
+      endif
+      if (use_obs_kind_clearair_reflectivity) then
+        call write_DART_ob_info(fi, obs_kind_clearair_reflectivity, obs_name_clearair_reflectivity, append_eval)
+      endif
+      if (use_obs_kind_zdr) then
+        call write_DART_ob_info(fi, obs_kind_zdr, obs_name_zdr, append_eval)
+      endif
+      if (use_obs_kind_kdp) then
+        call write_DART_ob_info(fi, obs_kind_kdp, obs_name_kdp, append_eval)
+      endif
+      if (use_obs_kind_u_10m) then
+        call write_DART_ob_info(fi, obs_kind_u_10m, obs_name_u_10m, append_eval)
+      endif
+      if (use_obs_kind_v_10m) then
+        call write_DART_ob_info(fi, obs_kind_v_10m, obs_name_v_10m, append_eval)
+      endif
+      if (use_obs_kind_T_2m) then
+        call write_DART_ob_info(fi, obs_kind_T_2m, obs_name_T_2m, append_eval)
+      endif
+      if (use_obs_kind_THETA_2m) then
+        call write_DART_ob_info(fi, obs_kind_THETA_2m, obs_name_THETA_2m, append_eval)
+      endif
+      if (use_obs_kind_Td_2m) then
+        call write_DART_ob_info(fi, obs_kind_Td_2m, obs_name_Td_2m, append_eval)
+      endif
+      if (use_obs_kind_qv_2m) then
+        call write_DART_ob_info(fi, obs_kind_qv_2m, obs_name_qv_2m, append_eval)
+      endif
 
       num_obs = max_num_obs
       write(fi,*) ' num_copies: ', num_copies, ' num_qc: ', num_qc
