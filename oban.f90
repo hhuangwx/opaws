@@ -361,6 +361,7 @@ PROGRAM OBAN
 
   write(6,*)
   write(6,*) 'allow_extrapolation = ', allow_extrapolation
+  write(6,*) 'append_eval = ', append_eval
   write(6,*) 'use_clear_air_type = ', use_clear_air_type
   write(6,*) 'clear_air_skip = ', clear_air_skip
   write(6,*) 'height_max = ', height_max
@@ -699,7 +700,7 @@ PROGRAM OBAN
     min_threshold(:) = -999.9
 !   note:  if use_clear_air_type is .true., then the following subroutine can modify the reflectivity analysis
     CALL DART_radar_out(output_prefix, anal, sweep_info, map_proj, &
-                        nfld, min_threshold, fill_flag, fill_value, use_clear_air_type, clear_air_skip)
+                        nfld, min_threshold, fill_flag, fill_value, append_eval, use_clear_air_type, clear_air_skip)
     deallocate(min_threshold)
   ENDIF
 
