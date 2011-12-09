@@ -455,8 +455,9 @@ END SUBROUTINE WRITENETCDF
 !############################################################################
 
 ! DCD 11/26/10
-  SUBROUTINE DART_radar_out(prefix, anal, sweep_info, map_proj,   &
-                            nfld, min_threshold, fill_flag, fill_value, use_clear_air_type, clear_air_skip)
+  SUBROUTINE DART_radar_out(prefix, anal, sweep_info, map_proj,            &
+                            nfld, min_threshold, fill_flag, fill_value,    &
+                            append_eval, use_clear_air_type, clear_air_skip)
 
     USE DTYPES_module
     USE DART_module
@@ -479,6 +480,7 @@ END SUBROUTINE WRITENETCDF
     real min_threshold(nfld)     ! value below which input observations are set to missing
     integer fill_flag(nfld)      ! fill missing values with a specified value? (0=no, 1=yes)
     real fill_value(nfld)        ! replacement value, if fill_flag==1
+    logical append_eval          ! .true. if "_EVAL" should be appended to the names of DART observation types
     logical use_clear_air_type   ! .true. (.false.) if clear-air reflectivity ob. type should (not) be used for DART output
     integer clear_air_skip       ! thinning factor for clear air reflectivity data
       
@@ -766,7 +768,7 @@ END SUBROUTINE WRITENETCDF
     qc_value = 1.0
     max_num_obs = num_obs   ! This will write in the maximum number of observations at top of DART file
 
-    call write_DART_header(fi, qc_string)
+    call write_DART_header(fi, append_eval, qc_string)
 
 ! Write observations.
 
