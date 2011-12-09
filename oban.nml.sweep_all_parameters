@@ -77,6 +77,7 @@
    cm_min_sweeps = 1                  ! minimum number of sweeps for identifying clutter
    cm_ncfile = ""                     ! netcdf file that contains clutter-mask information (output from clutter_stats)
                                       !
+   append_eval = .false.              ! .true. if "_EVAL" should be appended to the names of DART observation types
    use_clear_air_type = .false.       ! .true. if clear-air reflectivity ob. type should be used for DART output
    clear_air_skip = 0                 ! thinning factor for clear-air reflectivity data
                                       !
