@@ -124,9 +124,12 @@ c     Modifications:
 c
 c############################################################################
 
-      subroutine default_DART_obs_kind()
+      subroutine default_DART_obs_kind(append_eval)
 
       implicit none
+
+c---- Passed variables
+      logical append_eval          ! .true. if "_EVAL" should be appended to the names of DART observation types
 
       obs_kind_Doppler_velocity = 11
       obs_kind_reflectivity = 12
@@ -139,6 +142,20 @@ c############################################################################
       obs_kind_THETA_2m = 6
       obs_kind_Td_2m = 9
       obs_kind_qv_2m = 5
+      
+      if (append_eval) then
+        obs_kind_Doppler_velocity = obs_kind_Doppler_velocity + 100
+        obs_kind_reflectivity = obs_kind_reflectivity + 100
+        obs_kind_clearair_reflectivity = obs_kind_clearair_reflectivity + 100
+        obs_kind_zdr = obs_kind_zdr + 100
+        obs_kind_kdp = obs_kind_kdp + 100
+        obs_kind_u_10m = obs_kind_u_10m + 100
+        obs_kind_v_10m = obs_kind_v_10m + 100
+        obs_kind_T_2m = obs_kind_T_2m + 100
+        obs_kind_THETA_2m = obs_kind_THETA_2m + 100
+        obs_kind_Td_2m = obs_kind_Td_2m + 100
+        obs_kind_qv_2m = obs_kind_qv_2m + 100
+      endif
 
       RETURN
       END SUBROUTINE default_DART_obs_kind
@@ -395,13 +412,14 @@ c
 c
 c############################################################################
 
-      subroutine read_DART_header(fi)
+      subroutine read_DART_header(fi, append_eval)
 
       implicit none
 
 c---- Passed variables
 
       integer fi                            ! file unit number
+      logical append_eval                   ! .true. if "_EVAL" should be appended to the names of DART observation types
 
 c---- Local variables
 
@@ -412,7 +430,7 @@ c---- Local variables
       integer n
 
 
-      call default_DART_obs_kind()
+      call default_DART_obs_kind(append_eval)
 
       read(fi,*)      ! "obs_sequence"
       read(fi,*)      ! "obs_kind_definitions"
@@ -512,20 +530,17 @@ c---- Passed variables
 c---- Local variables
 
       integer ls                   ! string length
-      integer temp_obs_kind
       character(len=32) temp_obs_name
 
       if (append_eval) then
-        temp_obs_kind = obs_kind + 100
         temp_obs_name = obs_name
         ls = index(obs_name, ' ') - 1
         ls = min(ls, 27)
         temp_obs_name(ls+1:ls+5) = '_EVAL'
       else
-        temp_obs_kind = obs_kind
         temp_obs_name = obs_name
       endif
-      write(fi,*) temp_obs_kind, temp_obs_name
+      write(fi,*) obs_kind, temp_obs_name
 
       RETURN
       END SUBROUTINE write_DART_ob_info
@@ -574,7 +589,7 @@ c---- Local variables
       integer n
 
 
-      call default_DART_obs_kind()
+      call default_DART_obs_kind(append_eval)
 
       allocate(copy_meta_data(num_copies))
       allocate(qc_meta_data(num_qc))
