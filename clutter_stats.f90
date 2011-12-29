@@ -360,7 +360,10 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(number_of_sweeps, swpfilename, input_data_forma
   integer a                               ! azimuth index
   integer e                               ! elevation index
 
-  logical no_data_found                   ! .true. if sweepread did not return any valid rays
+  real prev_fixed_ang                     ! elevation angle (deg) of previous sweep
+  logical prev_refl_data_found            ! .true. if sweepread returned some valid reflectivity data for previous sweep
+  logical refl_data_found                 ! .true. if sweepread returned some valid reflectivity data for current sweep
+  logical vel_data_found                  ! .true. if sweepread returned some valid velocity data for current sweep
   logical good_gate                       ! .true. if gate has valid data
   logical clutter_gate                    ! .true. if gate meets thresholds for fixed clutter
 
@@ -388,7 +391,9 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(number_of_sweeps, swpfilename, input_data_forma
   type(swib_info)                     :: swib
   type(ryib_info), dimension(maxrays) :: ryib
   type(asib_info), dimension(maxrays) :: asib
-  type(rdat_info), dimension(maxrays) :: rdat_r, rdat_v
+  type(rdat_info), dimension(maxrays) :: rdat_r          ! reflectivity data from current sweep
+  type(rdat_info), dimension(maxrays) :: rdat_v          ! velocity data from current sweep
+  type(rdat_info), dimension(maxrays) :: rdat_r_prev     ! reflectivity data from previous sweep
 
   integer i                 ! index of current statistic type
   integer i_fixed_clutter   ! stat index corresponding to frequency of fixed clutter
@@ -431,6 +436,9 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(number_of_sweeps, swpfilename, input_data_forma
   vel_sum(:,:,:) = 0.0
   vel_sq_sum(:,:,:) = 0.0
 
+  prev_fixed_ang = -999.9
+  prev_refl_data_found = .false.
+
   DO s = 1, number_of_sweeps
 
     data_from_current_sweep(:,:,:) = .false.
@@ -439,24 +447,42 @@ SUBROUTINE COMPUTE_CLUTTER_STATS(number_of_sweeps, swpfilename, input_data_forma
 
       write(6,FMT='("sweep file: ",a)') trim(swpfilename(s))
 
-      no_data_found = .false.
+      refl_data_found = .true.
+      vel_data_found = .true.
 
       write(6,FMT='("field: ",a8)') refl_field_name
       call sweepread(swpfilename(s),vold,radd,celv,cfac,parm,swib,ryib,asib,rdat_r,refl_field_name)
       IF (swib%num_rays .eq. 0) THEN
         write(6,*) 'sweepread did not return any valid rays'
-        no_data_found = .true.
+        refl_data_found = .false.
       ENDIF
 
       write(6,FMT='("field: ",a8)') vel_field_name
       call sweepread(swpfilename(s),vold,radd,celv,cfac,parm,swib,ryib,asib,rdat_v,vel_field_name)
       IF (swib%num_rays .eq. 0) THEN
         write(6,*) 'sweepread did not return any valid rays'
-        no_data_found = .true.
+        vel_data_found = .false.
       ENDIF
 
+!     If 88D reflectivity and velocity data are split among sweeps, use reflectivity
+!     data from the previous sweep if needed.
+      IF ( vel_data_found .and. (.not. refl_data_found) .and. (prev_refl_data_found) .and.  &
+           (refl_field_name .eq. 'REF') .and. (swib%fixed_ang .eq. prev_fixed_ang) ) THEN
+        write(6,*) 'SUBSTITUTING REFLECTIVITY DATA FROM PREVIOUS SWEEP'
+        refl_data_found = prev_refl_data_found
+        DO r=1, maxrays
+          rdat_r(r)%data(:) = rdat_r_prev(r)%data(:)
+        ENDDO
+      ENDIF
+
+      prev_refl_data_found = refl_data_found
+      prev_fixed_ang = swib%fixed_ang
+      DO r=1, maxrays
+        rdat_r_prev(r)%data(:) = rdat_r(r)%data(:)
+      ENDDO
+
       call check_sweep_size(radd%num_param_desc, swib%num_rays)
-      IF (no_data_found) swib%num_rays=0
+      IF ( (.not. refl_data_found) .or. (.not. vel_data_found) ) swib%num_rays=0
 
       DO r=1, swib%num_rays
         a = nint( 0.5 + (ryib(r)%azimuth - amin) / da )
