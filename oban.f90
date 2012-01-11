@@ -100,6 +100,7 @@ PROGRAM OBAN
 
   logical, allocatable :: threshold(:,:)      ! Moved threshold array to calling program (from READSWEEP), so that subsequent calls to READSWEEP
                                               ! can access its contents
+  logical reference_time_initialized
 
   TYPE(SWEEP_INFORMATION) :: sweep_info       ! information about individual sweeps, such as Nyquist velocity (m/s) for each field
 
@@ -521,6 +522,7 @@ PROGRAM OBAN
 
   DO np = 1,npass
     CALL OBAN_INIT(nfld, anal, allow_extrapolation)
+    reference_time_initialized = .false.
     DO ns = 1,nswp
       IF(radar_data_format .eq. 1 ) THEN
         CALL READSWEEP(ns)
@@ -784,6 +786,7 @@ CONTAINS
     integer find_index              ! function used by this subroutine
     integer ri, ai, ei              ! range, azimuth, and elevation indices
     logical is_clutter
+    logical field_corrections_made
 
     ! dorade data structures    
     type(vold_info)                     :: vold
@@ -801,6 +804,7 @@ CONTAINS
 
 
       write(6,FMT='("READSWEEP IS CALLED")') 
+      field_corrections_made = .false.
 
       write(6,FMT='("READSWEEP:  Reading from ",a)') trim(vol%filename(s))
 
@@ -812,7 +816,8 @@ CONTAINS
         call sweepread(vol%filename(s),vold,radd,celv,cfac,parm,swib,ryib,asib,refl,cm_refl_fname)
         call check_sweep_size(radd%num_param_desc, swib%num_rays)
 !       For super-res 88D data, use the previous sweep if this is a second reflectivity sweep at a duplicate elevation angle.
-        IF ( (cm_refl_fname .eq. 'REF') .and. (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
+        IF ( (cm_refl_fname .eq. 'REF') .and. (s.gt.1) .and.                &
+             (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
           write(6,*) 'USING REFLECTIVITY DATA FROM PREVIOUS SWEEP'
           DO r=1, maxrays
             refl(r)%data(:) = prev_refl(r)%data(:)
@@ -829,7 +834,8 @@ CONTAINS
         call check_sweep_size(radd%num_param_desc, swib%num_rays)
 
 !       For super-res 88D data, don't use the second reflectivity sweep at a duplicate elevation angle.
-        IF ( (vol%sweep%field(n)%name .eq. 'REF') .and. (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
+        IF ( (vol%sweep%field(n)%name .eq. 'REF') .and.                     &
+             (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
           write(6,*) 'DELETING REFLECTIVITY DATA at duplicate elevation angle:  ', swib%fixed_ang
           DO r=1, swib%num_rays
             rdat(r)%data(:) = sbad
@@ -991,10 +997,12 @@ CONTAINS
         ENDIF      ! IF ( (year_cor .ne. 0) .or. (day_cor .ne. 0) .or. (sec_cor .ne. 0) ) THEN
 
 !-------------------------------------------------------------------------------
-        IF (n .eq. 1) THEN
+        IF (.not. field_corrections_made) THEN
+
+          field_corrections_made = .true.
 
           write(6,*) 
-          write(6,*) "DATE AND TIME of N == 1 SWEEP"
+          write(6,*) "DATE AND TIME of SWEEP ", n
           write(6,*) "---------------------------------------------------------"
           write(6,*) 'Year of sweep       = ', vold%year
           write(6,*) 'Julian day of sweep = ', ryib(1)%julian_day 
@@ -1006,7 +1014,8 @@ CONTAINS
           CALL SET_DATE_GREGORIAN_JD(vol%day, vol%sec, int(vold%year), int(ryib(1)%julian_day), &
                                      int(ryib(1)%hour), int(ryib(1)%min), int(ryib(1)%sec))
 
-          IF (s.eq.1) THEN
+          IF (.not. reference_time_initialized) THEN
+            reference_time_initialized = .true.
             CALL GET_DATE_GREGORIAN(vol%day, vol%sec, year, month, day, hour, minute, second)
             IF (cyr .eq. i_missing) THEN
               cyr = year
@@ -1032,7 +1041,7 @@ CONTAINS
               cse = second
               write(6,*) "READSWEEP:  setting reference second (cse) to ", cse
             ENDIF
-          ENDIF      ! IF (s.eq.1)
+          ENDIF      ! IF (.not. reference_time_initialized)
 
           call set_julian_day(cjd, int(cyr), int(cmo), int(cda))
  
@@ -1100,7 +1109,7 @@ CONTAINS
 
           ENDIF
 
-        ENDIF  ! ENDIF for n==1 condition
+        ENDIF  ! ENDIF for (.not. field_corrections_made)
 
 ! Thresholding data based on n==1 threshold flags (assuming its DBZ!!!)
  
