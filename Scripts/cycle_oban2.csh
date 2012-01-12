@@ -1,4 +1,6 @@
 #!/bin/csh
+
+#############################################################################
 #
 # cycle_oban2.csh
 #
@@ -15,6 +17,23 @@
 #
 # Acknowledgments:  Data Assimilation Research Testbed (DART), for date and time processing
 #
+############################## LICENSE ######################################
+#
+#   Copyright (C) <2012>  <David C. Dowell and Louis J. Wicker, NOAA>
+#
+#   This library is free software; you can redistribute it and/or
+#   modify it under the terms of the GNU Lesser General Public
+#   License as published by the Free Software Foundation; either
+#   version 2.1 of the License, or (at your option) any later version.
+#
+#   This library is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#   Lesser General Public License for more details.
+#
+############################## LICENSE ######################################
+
+
 #******************* USER NEEDS TO SPECIFY THE FOLLOWING INFORMATION ***********************
 
 set RADAR = 'KBMX'
@@ -30,11 +49,10 @@ set INTERVAL_SEC = 180
 
 set NUM_TIMES = 20
 
-
-#****************************** END OF USER SPECIFICATIONS *********************************
-
 set SWEEP_DIR = /Volumes/username/27apr11/88D/${RADAR}/dorade
 set ANALYSIS_DIR = /Volumes/username/27apr11/88D/${RADAR}/obs_seq
+
+#****************************** END OF USER SPECIFICATIONS *********************************
 
 if ($RADAR == 'KBMX') then
   set RADAR_LINE1 = 'rlon = -86.7697,                   ! radar longitude (deg)'
