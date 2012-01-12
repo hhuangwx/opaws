@@ -815,14 +815,28 @@ CONTAINS
         write(6,FMT='("READING REFLECTIVITY FIELD FOR CLUTTER MASKING:  ",a8)') cm_refl_fname
         call sweepread(vol%filename(s),vold,radd,celv,cfac,parm,swib,ryib,asib,refl,cm_refl_fname)
         call check_sweep_size(radd%num_param_desc, swib%num_rays)
+
 !       For super-res 88D data, use the previous sweep if this is a second reflectivity sweep at a duplicate elevation angle.
         IF ( (cm_refl_fname .eq. 'REF') .and. (s.gt.1) .and.                &
              (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
-          write(6,*) 'USING REFLECTIVITY DATA FROM PREVIOUS SWEEP'
+          write(6,*) 'DUPLICATE FOUND, USING REFLECTIVITY DATA FROM PREVIOUS SWEEP'
           DO r=1, maxrays
             refl(r)%data(:) = prev_refl(r)%data(:)
           ENDDO
         ENDIF
+
+!       For 88D, use reflectivity data from the previous sweep if the current sweep has none.
+        IF ( (cm_refl_fname .eq. 'REF') .and. (swib%num_rays .eq. 0) ) THEN
+          IF (s.gt.1) THEN
+            write(6,*) 'NO REFLECTIVITY DATA, USING REFLECTIVITY DATA FROM PREVIOUS SWEEP'
+            DO r=1, maxrays
+              refl(r)%data(:) = prev_refl(r)%data(:)
+            ENDDO
+          ELSE
+            write(6,*) 'NOTE:  NO REFLECTIVITY DATA WILL BE AVAILABLE FOR REFLECTIVITY TEST'
+          ENDIF
+        ENDIF
+
       ENDIF
 
       DO n = 1,nfld
@@ -1002,7 +1016,7 @@ CONTAINS
           field_corrections_made = .true.
 
           write(6,*) 
-          write(6,*) "DATE AND TIME of SWEEP ", n
+          write(6,*) "DATE AND TIME of SWEEP ", s, ", FIELD ", n
           write(6,*) "---------------------------------------------------------"
           write(6,*) 'Year of sweep       = ', vold%year
           write(6,*) 'Julian day of sweep = ', ryib(1)%julian_day 
