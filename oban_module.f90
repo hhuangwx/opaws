@@ -186,7 +186,7 @@ CONTAINS
                            nfld, unfold_flag, Nyquist_vel,      &
                            method, gamma, hsp0, vsp0,           &
                            allow_extrapolation,                 &
-                           minsum, minrange, map_proj)
+                           minsum, minrange)
 
     implicit none
 
@@ -219,10 +219,6 @@ CONTAINS
                                     !   an objectively-analyzed observation
     real minrange                   ! minimum-range threshold (data closer to radar
                                     !   are discarded)
-    integer map_proj                ! map projection:
-                                    !   0 = flat earth
-                                    !   1 = oblique azimuthal
-                                    !   2 = Lambert conformal
                          
  !---- Local variables
 
@@ -469,7 +465,9 @@ CONTAINS
                   IF (iabs(b).gt.n_bin) THEN
                     write(6,*) 'outside Nyquist interval:'
                     write(6,*) vol%sweep%field(n)%ob(o)%value, Nyquist_vel(n), b
+
                     stop
+
                   ELSE
                     bin_count(i,j,b) = bin_count(i,j,b) + 1
                   ENDIF
