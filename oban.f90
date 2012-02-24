@@ -93,7 +93,7 @@ PROGRAM OBAN
   include 'v5df.h'
   include 'structures.inc'
 
-  character(LEN=128), parameter :: version = "Version 2.0.2:  Updated 30 August 2011 [DCD]"
+  character(LEN=128), parameter :: version = "Version 2.1:  Updated 24 February 2012 [DCD]"
 
   integer i, j, k, ns, np, nf                 ! loop variables
   integer ls                                  ! length of input string
@@ -289,6 +289,11 @@ PROGRAM OBAN
   write(6,*) 'glat = ', glat
   write(6,*) 'galt = ', galt
   write(6,*) 'map_proj = ', map_proj
+  if (map_proj .eq. 2) then
+    write(6,*) 'tlat1 = ', tlat1
+    write(6,*) 'tlat2 = ', tlat2
+    write(6,*) 'clon = ', clon
+  endif
   write(6,*) 'nx = ', nx
   write(6,*) 'ny = ', ny
   write(6,*) 'nz = ', nz
@@ -423,6 +428,10 @@ PROGRAM OBAN
   anal%glat = glat
   anal%glon = glon
   anal%galt = galt
+  anal%map_proj = map_proj
+  anal%tlat1    = tlat1
+  anal%tlat2    = tlat2
+  anal%clon     = clon
 
   allocate(anal%xg(nx))
   allocate(anal%yg(ny))
@@ -534,7 +543,7 @@ PROGRAM OBAN
                          nfld, unfold_flag, sweep_info%Nyquist_vel(1,ns),  &
                          method, gamma, hsp0, vsp0,                        &
                          allow_extrapolation,                              &
-                         minsum, minrange, map_proj)
+                         minsum, minrange)
     ENDDO   ! sweep loop
     CALL FINISH_ANALYSIS(vol, anal, np, nfld, allow_extrapolation, minsum)
   ENDDO  ! pass loop
@@ -682,15 +691,6 @@ PROGRAM OBAN
   deallocate(num_beams)
 
 !
-! Output analysis (NetCDF)
-!
-  IF (output_netcdf) THEN
-    write(6,*)
-    write(6,*) 'Outputting data to netCDF file'
-    CALL WRITENETCDF(output_prefix, analysis_type, anal, ut, vt, int(cyr), int(cmo), int(cda), int(chr), int(cmn), int(cse))
-  ENDIF
-
-!
 ! Output analysis (DART format)
 !
   IF (output_dart) THEN
@@ -701,11 +701,20 @@ PROGRAM OBAN
     allocate(min_threshold(nfld))
     min_threshold(:) = -999.9
 !   note:  if use_clear_air_type is .true., then the following subroutine can modify the reflectivity analysis
-    CALL DART_radar_out(output_prefix, anal, sweep_info, map_proj, &
+    CALL DART_radar_out(output_prefix, anal, sweep_info, &
                         nfld, min_threshold, fill_flag, fill_value, append_eval, use_clear_air_type, clear_air_skip)
     deallocate(min_threshold)
   ENDIF
 
+!
+! Output analysis (NetCDF)
+!
+  IF (output_netcdf) THEN
+    write(6,*)
+    write(6,*) 'Outputting data to netCDF file'
+    CALL WRITENETCDF(output_prefix, analysis_type, anal, ut, vt, int(cyr), int(cmo), int(cda), int(chr), int(cmn), int(cse))
+  ENDIF
+  
 !
 ! Vis5d output 
 !
@@ -873,7 +882,8 @@ CONTAINS
           anal%rlon = vol%rlon
           anal%ralt = vol%ralt
 
-          CALL ll_to_xy(vol%xoffset, vol%yoffset, map_proj, dtor*glat, dtor*glon, dtor*vol%rlat, dtor*vol%rlon)
+          CALL ll_to_xy(vol%xoffset, vol%yoffset, map_proj, dtor*tlat1, dtor*tlat2, dtor*clon, &
+                        dtor*glat, dtor*glon, dtor*vol%rlat, dtor*vol%rlon)
           vol%zoffset = vol%ralt - galt
 
           write(6,FMT='("X-Offset of radar Lat/Lon relative to Lat/Lon coordinate of analysis grid: ",f7.2," km")') vol%xoffset
@@ -1190,8 +1200,9 @@ CONTAINS
 ! Here, create x/y/z coordinates based on distance from radar
 
 ! DCD 1/26/11 difference from OPAWS1:  x, y, and z here are relative to radar, not grid origin
-              call xyzloc(x, y, z, range, dtor*ryib(r)%azimuth, dtor*ryib(r)%elevation, map_proj, &
-                          dtor*vol%rlat, dtor*vol%rlon, vol%ralt,                                 &
+              call xyzloc(x, y, z, range, dtor*ryib(r)%azimuth, dtor*ryib(r)%elevation, &
+                          map_proj, dtor*tlat1, dtor*tlat2, dtor*clon,                  &
+                          dtor*vol%rlat, dtor*vol%rlon, vol%ralt,                       &
                           dtor*vol%rlat, dtor*vol%rlon, vol%ralt, ut, vt, ti)
 
               vol%sweep%field(n)%ob(m)%x        = x
@@ -1416,7 +1427,8 @@ CONTAINS
             anal%rlon = vol%rlon
             anal%ralt = vol%ralt
 
-            CALL ll_to_xy(vol%xoffset, vol%yoffset, map_proj, dtor*glat, dtor*glon, dtor*vol%rlat, dtor*vol%rlon)
+            CALL ll_to_xy(vol%xoffset, vol%yoffset, map_proj, dtor*tlat1, dtor*tlat2, dtor*clon, &
+                          dtor*glat, dtor*glon, dtor*vol%rlat, dtor*vol%rlon)
             vol%zoffset = vol%ralt - galt
 
             write(6,FMT='("X-Offset of radar Lat/Lon relative to Lat/Lon coordinate of analysis grid: ",f7.2," km")') vol%xoffset
@@ -1566,8 +1578,9 @@ CONTAINS
 ! Here, create x/y/z coordinates based on distance from radar
  
 ! DCD 1/26/11 difference from OPAWS1:  x, y, and z here are relative to radar, not grid origin
-               call xyzloc(x, y, z, fdata%range(g), dtor*fdata%az(r), dtor*fdata%el(r), map_proj, &
-                           dtor*vol%rlat, dtor*vol%rlon, vol%ralt,                                &
+               call xyzloc(x, y, z, fdata%range(g), dtor*fdata%az(r), dtor*fdata%el(r), &
+                           map_proj, dtor*tlat1, dtor*tlat2, dtor*clon,                 &
+                           dtor*vol%rlat, dtor*vol%rlon, vol%ralt,                      &
                            dtor*vol%rlat, dtor*vol%rlon, vol%ralt, ut, vt, ti)
 
                vol%sweep%field(n)%ob(m)%x        = x
