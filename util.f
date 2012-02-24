@@ -1510,15 +1510,20 @@ c     This subroutine computes the projected (x, y) coordinates of the
 c     point (lat2, lon2) relative to (lat1, lon1).  Various map projections
 c     are possible.
 c
+c     NOTE:  LATITUDES AND LONGITUDES ARE IN RADIANS.
+c
 c############################################################################
 c
 c     Author:  David Dowell
 c
 c     Creation Date:  25 February 2005
 c
+c     Lambert conformal projection added 24 Feb 2012 by Mike Coniglio and David Dowell
+c     reference:  http://mathworld.wolfram.com/LambertConformalConicProjection.html
+c
 c############################################################################
 
-      subroutine ll_to_xy(x, y, map_proj, lat1, lon1, lat2, lon2)
+      subroutine ll_to_xy(x, y, map_proj, tlat, blat, cenlon, lat1, lon1, lat2, lon2)
 
       implicit none
 
@@ -1532,15 +1537,40 @@ c---- Passed variables
                                   !   0 = flat earth
                                   !   1 = oblique azimuthal
                                   !   2 = Lambert conformal
+      real tlat                   ! First true latitude (rad N) of Lambert conformal projection
+      real blat                   ! Second true latitude (rad N) of Lambert conformal projection
+      real cenlon                 ! Reference longitude (rad E) of Lambert conformal projection
 
 c---- Returned variables
 
       real x, y                   ! distance (km)
 
+c---- Internal variables
+
+      real b,c1,d,x1,y1,x2,y2,xlat,xlon
+      
 
       if (map_proj.eq.0) then
         x = rearth * cos(0.5*(lat1+lat2)) * (lon2-lon1)
         y = rearth * (lat2-lat1)
+      else if (map_proj.eq.2) then
+        b      = (alog(sin(tlat))-alog(sin(blat)))/(alog(tan(tlat/2.))-alog(tan(blat/2.)))
+        c1     = rearth*sin(tlat)/(b*tan(tlat/2.)**b)
+c---- first find the x and y of the first point
+        xlat   = (pi/2.)-lat1
+        xlon   = lon1
+        d      = c1*(sin(xlat)/(1.+cos(xlat)))**b
+        x1     = d*sin(b*(xlon-cenlon))
+        y1     = d*cos(b*(xlon-cenlon))
+c---- now find the x and y of the second point
+        xlat   = (pi/2.)-lat2
+        xlon   = lon2
+        d      = c1*(sin(xlat)/(1.+cos(xlat)))**b
+        x2     = d*sin(b*(xlon-cenlon))
+        y2     = d*cos(b*(xlon-cenlon))
+c---- subtract to find x, y distances (km)
+        x      = x2-x1
+        y      = y1-y2  ! makes positive values point to north instead of south
       else
         write(*,*) 'map projection unavailable:  ', map_proj
         stop
@@ -1564,6 +1594,8 @@ c
 c     This subroutine computes the projected (lat, lon) coordinates of the
 c     point (x, y) relative to (lat0, lon0).  Various map projections
 c     are possible.
+C
+c     NOTE:  LATITUDES AND LONGITUDES ARE IN RADIANS.
 c
 c############################################################################
 c
@@ -1571,9 +1603,12 @@ c     Author:  David Dowell
 c
 c     Creation Date:  25 February 2005
 c
+c     Lambert conformal projection added 24 Feb 2012 by Mike Coniglio and David Dowell
+c     reference:  http://mathworld.wolfram.com/LambertConformalConicProjection.html
+c
 c############################################################################
 
-      subroutine xy_to_ll(lat, lon, map_proj, x, y, lat0, lon0)
+      subroutine xy_to_ll(lat, lon, map_proj, tlat, blat, cenlon, x, y, lat0, lon0)
 
       implicit none
 
@@ -1585,6 +1620,9 @@ c---- Passed variables
                                   !   0 = flat earth
                                   !   1 = oblique azimuthal
                                   !   2 = Lambert conformal
+      real tlat                   ! First true latitude (rad N) of Lambert conformal projection
+      real blat                   ! Second true latitude (rad N) of Lambert conformal projection
+      real cenlon                 ! Reference longitude (rad E) of Lambert conformal projection
       real x, y                   ! distance (km)
       real lat0, lon0             ! coordinates (rad) of origin (where x=0, y=0)
 
@@ -1592,10 +1630,30 @@ c---- Returned variables
 
       real lat, lon               ! coordinates (rad) of point
 
+c---- Internal variables
+
+      real b,c1,d,e,x1,y1,x2,y2,xlat,xlon
+
 
       if (map_proj.eq.0) then
         lat = lat0 + y / rearth
         lon = lon0 + x / ( rearth * cos(0.5*(lat0+lat)) )
+      else if (map_proj.eq.2) then
+c---- first find the x and y of the reference lat/lon
+        xlat   = (pi/2.)-lat0
+        xlon   = lon0
+        b      = (alog(sin(tlat))-alog(sin(blat)))/(alog(tan(tlat/2.))-alog(tan(blat/2.)))
+        c1     = rearth*sin(tlat)/(b*tan(tlat/2.)**b)
+        d      = c1*(sin(xlat)/(1.+cos(xlat)))**b
+        x1     = d*sin(b*(xlon-cenlon))
+        y1     = d*cos(b*(xlon-cenlon))
+c---- now find the lat/lon of the point defined by the input x and y
+        x2     = x1+x
+        y2     = y1-y
+        d      = c1**(2./b)-(x2**2+y2**2)**(1./b)
+        e      = c1**(2./b)+(x2**2+y2**2)**(1./b)
+        lat    = asin(d/e)
+        lon    = (1./b)*atan(x2/y2)+cenlon
       else
         write(*,*) 'map projection unavailable:  ', map_proj
         stop
@@ -2348,7 +2406,8 @@ c
 c############################################################################
 
       subroutine xyzloc(x, y, z, r, az0, el0, 
-     $                  map_proj, glat, glon, galt, rlat, rlon, ralt,
+     $                  map_proj, tlat, blat, cenlon,
+     $                  glat, glon, galt, rlat, rlon, ralt,
      $                  ut, vt, ti)
 
       implicit none
@@ -2364,6 +2423,9 @@ c---- Passed variables
                                !   0 = flat earth
                                !   1 = oblique azimuthal
                                !   2 = Lambert conformal
+      real tlat                ! First true latitude (rad N) of Lambert conformal projection
+      real blat                ! Second true latitude (rad N) of Lambert conformal projection
+      real cenlon              ! Reference longitude (rad E) of Lambert conformal projection
       real glat, glon          ! latitude and longitude of grid origin (rad)
       real galt                ! altitude of grid origin (km MSL)
       real rlat, rlon          ! radar latitude and longitude (rad)
@@ -2399,7 +2461,7 @@ c     observation (lat, lon) [E. Williams, "Aviation Formulary V1.42"]
 
 c     observation (x, y)
 
-      call ll_to_xy(x, y, map_proj, glat, glon, lat, lon)
+      call ll_to_xy(x, y, map_proj, tlat, blat, cenlon, glat, glon, lat, lon)
 
 c     storm-motion adjustment
 
