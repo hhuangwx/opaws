@@ -15,7 +15,7 @@ c
 ------------------------------ LICENSE TERMS-------------------------------------------
 
 
-===> Observation Processing And Wind Synthesis (OPAWS) version 2.0
+===> Observation Processing And Wind Synthesis (OPAWS) version 2
 ===> based on NSSL_Oban2D version 2.3 and OPAWS version 1.6.1
 ===> This version does 2D analysis on PPI surface or 3D analysis on a cartesian grid.
 ===> Multipass Barnes and Cressman analysis schemes are available.
@@ -27,7 +27,7 @@ David C. Dowell, NOAA Earth System Research Laboratory
 
 Contributors:
 Wen-Chau Lee (2001):  dorade sweep-file reader
-Mike Coniglio (2005, 2006):  velocity unfolding, ground-clutter removal, Mesonet-data input
+Mike Coniglio (2005, 2006, 2012):  velocity unfolding, ground-clutter removal, Mesonet-data input, Lambert conformal map projection
 M. Majcen, P. Markowski, Y. Richardson, J. Wurman (2007):  multi-pass objective analysis
 Glen Romine (2010):  suggestion of ground-clutter mask
 Robin Tanamachi, Dan Dawson (2010):  bug fixes, filtering
@@ -56,6 +56,16 @@ BUILD instructions
 4.  Compile by typing "make".  Two executables are built:  x.oban and x.clutter_stats
 
 ================================================================================
+
+changes for version 2.1 of OPAWS (24 February 2012) - DCD
+---------------------------------------------------------------------------
+* A new tool has been added for removing ground clutter.  The technique is based on the Clutter Residue Editing Map
+  (CREM) by Lakshmanan et al. 2010.  Clutter is detected by x.clutter_stats and removed by x.oban.
+* A sector of data can now be selected or excluded.
+* Handling of reflectivity and velocity data split among WSR-88D sweeps has been improved.
+* DART_radar_out now appears before WriteNetCDF in oban.f90.  Now, effects of thinning clear-air data will appear
+  in both the DART and NetCDF files, rather than just the DART file.
+* A Lambert conformal map projection has been added, controlled by the namelist parameters map_proj, tlat1, tlat2, and clon.
 
 changes for version 2.0.2 of OPAWS (30 August 2011) - DCD
 ---------------------------------------------------------------------------
