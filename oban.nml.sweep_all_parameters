@@ -22,7 +22,11 @@
    map_proj = 0,                      ! map projection (for relating lat, lon to x, y):
                                       !   0 = flat earth
                                       !   1 = oblique azimuthal (not implemented...)
-                                      !   2 = Lambert conformal (not implemented...)
+                                      !   2 = Lambert conformal
+                                      !
+   tlat1 =  30.0,                     ! First true latitude (deg N) of Lambert conformal projection
+   tlat2 =  60.0,                     ! Second true latitude (deg N) of Lambert conformal projection
+   clon  = -97.461945,                ! Reference longitude (deg E) of Lambert conformal projection
                                       ! 
    cyr = 2003,                        ! reference date used for (optional) time-to-space conversion:  year
    cmo = 05,                          ! "                                                         ": month
