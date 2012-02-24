@@ -80,6 +80,10 @@ MODULE DTYPES_module
     real                 :: xmin, ymin, zmin
     real                 :: glat, glon, galt
     real                 :: rlat, rlon, ralt   ! radar latitude (deg), longitude (deg), and altitude (km MSL)
+    integer              :: map_proj           ! map projection (0 = flat earth, 2 = Lambert conformal)
+    real                 :: tlat1              ! First true latitude (deg N) of Lambert conformal projection
+    real                 :: tlat2              ! Second true latitude (deg N) of Lambert conformal projection
+    real                 :: clon               ! Reference longitude (deg E) of Lambert conformal projection
     real, allocatable    :: xg(:)              ! x-cordinate of analysis grid
     real, allocatable    :: yg(:)              ! y-coordinate of analysis grid
     real, allocatable    :: zg(:)              ! z-coordinate of analysis grid
