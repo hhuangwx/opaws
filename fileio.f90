@@ -455,7 +455,7 @@ END SUBROUTINE WRITENETCDF
 !############################################################################
 
 ! DCD 11/26/10
-  SUBROUTINE DART_radar_out(prefix, anal, sweep_info, map_proj,            &
+  SUBROUTINE DART_radar_out(prefix, anal, sweep_info,                      &
                             nfld, min_threshold, fill_flag, fill_value,    &
                             append_eval, use_clear_air_type, clear_air_skip)
 
@@ -472,10 +472,6 @@ END SUBROUTINE WRITENETCDF
 ! Passed variables:  not changed by subroutine
     character(len=*) prefix   ! prefix of the output file name
     TYPE(SWEEP_INFORMATION) :: sweep_info      ! info. about individual sweeps, such as Nyquist velocity (m/s) for each field
-    integer map_proj             ! map projection (for relating lat, lon to x, y):
-                                 !   0 = flat earth
-                                 !   1 = oblique azimuthal
-                                 !   2 = Lambert conformal
     integer nfld                 ! number of fields
     real min_threshold(nfld)     ! value below which input observations are set to missing
     integer fill_flag(nfld)      ! fill missing values with a specified value? (0=no, 1=yes)
@@ -495,6 +491,9 @@ END SUBROUTINE WRITENETCDF
     real    ob_value
     real glat, glon                                  ! grid lat and lon (rad)
     real(kind=8) rlat, rlon, rheight                 ! radar lat, lon (rad) and height (m)
+    real tlat                                        ! First true latitude (rad N) of Lambert conformal projection
+    real blat                                        ! Second true latitude (rad N) of Lambert conformal projection
+    real cenlon                                      ! Reference longitude (rad E) of Lambert conformal projection
     real lat, lon                                    ! lat and lon (rad)
     real(kind=8) olat, olon, oheight                 ! observation lat, lon (rad) and height (m)
     real x, y                                        ! observation coordinates (km)
@@ -530,6 +529,12 @@ END SUBROUTINE WRITENETCDF
     rlat    = dtor*anal%rlat
     rlon    = dtor*anal%rlon
     rheight = 1000.0*anal%ralt
+
+    if (anal%map_proj .eq. 2) then
+      tlat   = dtor * anal%tlat1
+      blat   = dtor * anal%tlat2
+      cenlon = dtor * anal%clon
+    endif
 
     IF (nfld .le. 0) THEN
       write(6,*) 'error:  nfld = ', nfld
@@ -792,7 +797,7 @@ END SUBROUTINE WRITENETCDF
             x = anal%xg(i)
             y = anal%yg(j)
 
-            CALL xy_to_ll(lat, lon, map_proj, x, y, glat, glon)
+            CALL xy_to_ll(lat, lon, anal%map_proj, tlat, blat, cenlon, x, y, glat, glon)
 
             olat    = lat
             olon    = lon
