@@ -169,7 +169,11 @@ MODULE OBAN_PARAMETERS
   integer :: map_proj = 0                       ! map projection (for relating lat, lon to x, y):
                                                 !   0 = flat earth
                                                 !   1 = oblique azimuthal (not implemented...)
-                                                !   2 = Lambert conformal (not implemented...)
+                                                !   2 = Lambert conformal
+
+  real    :: tlat1 = 30.0                       ! First true latitude (deg N) of Lambert conformal projection
+  real    :: tlat2 = 60.0                       ! Second true latitude (deg N) of Lambert conformal projection
+  real    :: clon  = r_missing                  ! Reference longitude (deg E) of Lambert conformal projection
 
                                                 ! reference date and time used for (optional) time-to-space conversion:
   integer(kind=2) :: cyr = i_missing            !    year
@@ -277,6 +281,9 @@ MODULE OBAN_PARAMETERS
                           rlat,                  &
                           ralt,                  &
                           map_proj,              &
+                          tlat1,                 &
+                          tlat2,                 &
+                          clon,                  &
                           cyr,                   &
                           cmo,                   &
                           cda,                   &
@@ -355,6 +362,9 @@ MODULE OBAN_PARAMETERS
      CALL DICT_CREATE( "rlat",     flt=rlat )
      CALL DICT_CREATE( "ralt",     flt=ralt )
      CALL DICT_CREATE( "map_proj", int=map_proj )
+     CALL DICT_CREATE( "tlat1",    flt=tlat1 )
+     CALL DICT_CREATE( "tlat2",    flt=tlat2 )
+     CALL DICT_CREATE( "clon",     flt=clon )
      CALL DICT_CREATE( "central year",   int=int(cyr) )
      CALL DICT_CREATE( "central month",  int=int(cmo) )
      CALL DICT_CREATE( "central day",    int=int(cda) )
@@ -652,7 +662,9 @@ MODULE NAMELIST_MODULE
     IF ( glat .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'glat')
     IF ( galt .eq. r_missing) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'galt')
 
-    IF ( map_proj .ne. 0) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'map_proj')
+    IF ( (map_proj .ne. 0) .and. (map_proj .ne. 2) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'map_proj')
+
+    IF ( (map_proj .eq. 2) .and. (clon .eq. r_missing) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'clon')
 
     IF ( (az_corr_flag .ne. 0) .and. (az_corr_flag .ne. 1) ) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'az_corr_flag')
 
