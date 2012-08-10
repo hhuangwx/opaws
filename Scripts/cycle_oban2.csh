@@ -363,10 +363,10 @@ while ($time_index <= $NUM_TIMES)
    dy = 6.0,                          ! grid spacing in y direction (km)
    dz = 1.0,                          ! grid spacing in z direction (km)
                                       !
-   map_proj = 0,                      ! map projection (for relating lat, lon to x, y):
+   map_proj = 2,                      ! map projection (for relating lat, lon to x, y):
                                       !   0 = flat earth
                                       !   1 = oblique azimuthal (not implemented...)
-                                      !   2 = Lambert conformal (not implemented...)
+                                      !   2 = Lambert conformal
                                       !
    output_prefix = '${RADAR}.${YEAR}_${MONTH}_${DAY}_${HOUR}_${MIN}_${SEC}',        ! prefix name for output files
                                       !
@@ -383,7 +383,7 @@ while ($time_index <= $NUM_TIMES)
    vsp0 = 2.120,                      ! either Cressman vertical radius of influence or Barnes smoothing parameter (1.33*dx), in km
    npass = 1,                         ! number of passes
                                       !
-   cm_use_clutter_mask = .true.,      ! .true. if clutter mask produced by clutter_stats should be implemented
+   cm_use_clutter_mask = .false.,     ! .true. if clutter mask produced by clutter_stats should be implemented
    cm_min_fixed_clutter_freq = 0.50,  ! minimum frequency (0.0 - 1.0) of fixed clutter from clutter_stats that will be considered clutter
    cm_min_moving_clutter_freq = 1.01, ! minimum frequency (0.0 - 1.0) of moving clutter from clutter_stats that will be considered clutter
    cm_halo = 1,                       ! number of additional neighboring bins in each direction to search for maximum in clutter frequency
