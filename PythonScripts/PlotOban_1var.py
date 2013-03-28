@@ -6,10 +6,11 @@ import numpy as N
 import sys
 import netCDF4
 from optparse import OptionParser
-from netcdftime import utime
+from netcdftime import utime, num2date
 import os
 import markup
 import ctables
+import datetime as DT
 from mpl_toolkits.axes_grid.inset_locator import inset_axes
 from mpl_toolkits.basemap import Basemap
 
@@ -18,8 +19,8 @@ output_format = "png"
 
 # ADD the name of the variables you want plotted here.
 #
-ref_variables = ["DBZ", "DZ"]
-vr_variables  = ["DV", "VE", "VR", "VEL", "VU"]
+ref_variables = ["DBZ", "DZ","REF"]
+vr_variables  = ["DV", "VDA", "VE", "VR", "VEL", "VU"]
 
 hscale = 1.0 / 1000.
 
@@ -185,7 +186,7 @@ def plotoban_gis(variable, ref, x, y, elevation, az, time, pass_no=1, directory=
         ax.set_title("DBZ Analysis / %s   / %4.2f deg P=%d" % (str.replace(time.isoformat(),"T","_"),elevation, pass_no),ha='center')
 
     if variable == "VR":
-        clevels = N.arange(-30,35,5)
+        clevels = N.arange(-50,55,5)
         plot = ax.contourf(x, y, ref, clevels, cmap=ctables.Not_PosDef_Default)
         axins   = inset_axes(ax, width="2%", height="35%", loc=3)
         locator = axins.get_axes_locator()
@@ -237,7 +238,7 @@ def plotoban_gis(variable, ref, x, y, elevation, az, time, pass_no=1, directory=
 
                 map.readshapefile(shapefile,'GIS_INFO',drawbounds=True,linewidth=line_width,color=color,ax=mapaxes1)
 
-            map.readshapefile('/Users/wicker/Downloads/ci01jn11/ci01jn11','GIS_INFO',drawbounds=True,linewidth=line_width,color=color,ax=mapaxes1)
+#           map.readshapefile('/Users/wicker/Downloads/ci01jn11/ci01jn11','GIS_INFO',drawbounds=True,linewidth=line_width,color=color,ax=mapaxes1)
 
     except OSError:
            print "GIS_PLOT:  NO SHAPEFILE ENV VARIABLE FOUND " 
@@ -380,17 +381,17 @@ def main(argv=None):
         if item == "y":     y  = q.copy()
 
     del(q)  # releasing some memory
-    
+
     date  = netCDF4.chartostring(ncdf_file.variables['start_date'][:])
     time  = netCDF4.chartostring(ncdf_file.variables['start_time'][:])
     date2 = str.replace(date.tostring(),"/","-")
-    
-    date_string = "seconds since "+ date2[6:10]+"-"+date2[0:5] + " " + time.tostring()
-    print
-    print "COARDS string from file:  ",date_string
-    
-    sec_utime = utime(date_string)
 
+    date_string = date2[6:10]+"-"+date2[0:5] + "_" + time.tostring()
+    print
+    print "COARDS string from file:  seconds since ",date_string
+    
+    init = DT.datetime.strptime(date_string, '%Y-%m-%d_%H:%M:%S')  # create a datetime object
+    
     var_shape = d.shape
     
     print
@@ -403,18 +404,24 @@ def main(argv=None):
     for p in [var_shape[1] - 1]:
         print "Processing pass = ", p
         for k in N.arange(0, var_shape[2], options.skip):
-            print "Processing level = ", k, el.shape, ti.shape
-            print "Slice: %3d  Sweep elevation:  %4.2f  Sweep time %s " % \
-                              (k,el[0,k,:,:].mean(), sec_utime.num2date(ti[0,k,:,:].mean()))
+            azraw  = az[0,k].flatten()
+            azmean = azraw[N.isfinite(azraw)].mean()
+            elraw  = el[0,k].flatten()
+            elmean = elraw[N.isfinite(elraw)].mean()
+            tiraw  = ti[0,k].flatten()
+            timean = tiraw[N.isfinite(tiraw)].mean()
+            stime  = init + DT.timedelta(seconds=int(timean))
+
+            print "Processing SWP: %d  EL:  %f  TIME:  %s " % (k, elmean, stime)
 
             if options.gis:
-              files.append(plotoban_gis(variable,d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
-                           sec_utime.num2date(ti[0,k].mean()), pass_no = p+1, directory = options.dir, \
+              files.append(plotoban_gis(variable,d[0,p,k], x, y, elmean, azmean, \
+                           stime, pass_no = p+1, directory = options.dir, \
                            glat=ncdf_file.variables['grid_latitude'][0],  glon=ncdf_file.variables['grid_longitude'][0], \
                            rlat=ncdf_file.variables['radar_latitude'][0], rlon=ncdf_file.variables['radar_longitude'][0]))
             else:
-              files.append(plotoban(variable,d[0,p,k], x, y, el[0,k].mean(), az[0,k], \
-                           sec_utime.num2date(ti[0,k].mean()), pass_no = p+1, directory = options.dir))
+              files.append(plotoban(variable,d[0,p,k], x, y, elmean, azmean, \
+                           stime, pass_no = p+1, directory = options.dir))
         
 # Now create the html file for looking at the data
 

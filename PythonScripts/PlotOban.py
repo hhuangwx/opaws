@@ -15,8 +15,8 @@ output_format = "png"
 
 # ADD the name of the variables you want plotted here.
 #
-ref_variables = ["DBZ", "DZ"]
-vr_variables  = ["DV", "VE", "VR", "VEL", "VU"]
+ref_variables = ["DBZ", "DZ", "REF"]
+vr_variables  = ["DV", "VE", "VR", "VDA", "VEL", "VU"]
 
 def create_html(directory,files):
 
@@ -50,15 +50,15 @@ def plotoban(ref, vr, x, y, elevation, az, time, pass_no=1, directory=None):
 
     filename = "%s/%s_%4.2f_pass_%d.png" % ("./"+directory,str.replace(time.isoformat(),"T","_"), elevation, pass_no)
                
-#   fig_y_size = 8 * (y.max() - y.min()) / (x.max()-x.min())
+    fig_y_size = 8.0 * (y.max() - y.min()) / (x.max()-x.min())
 
-    P.figure(figsize=(6,10))
+    P.figure(figsize=(6,fig_y_size))
     P.clf()
     P.axes().set_aspect('equal')
 
     plt = P.subplot(211)
     clevels = N.arange(0,75,5)
-    plt = P.contourf(x, y, ref, clevels, cmap=ctables.NWSRef)
+    plt = P.contourf(x, y, ref+0.1, clevels, cmap=ctables.NWSRef)
     cbar = P.colorbar(plt)
     cbar.ax.set_ylabel('dBZ')
     P.xlabel('X (km)')
@@ -222,11 +222,17 @@ def main(argv=None):
     for p in [var_shape[1] - 1]:
         print "Processing pass = ", p
         for k in N.arange(0, var_shape[2], options.skip):
-            print "Processing level = ", k, el.shape, ti.shape
-            print "Slice: %3d  Sweep elevation:  %4.2f  Sweep time %s " % \
-                              (k,el[0,k,:,:].mean(), sec_utime.num2date(ti[0,k,:,:].mean()))
-            files.append(plotoban(d[0,p,k], v[0,p,k], x, y, el[0,k].mean(), az[0,k], \
-                         sec_utime.num2date(ti[0,k].mean()), pass_no = p+1, directory = options.dir))
+            azraw  = az[0,k].flatten()
+            azmean = azraw[N.isfinite(azraw)].mean()
+            elraw  = el[0,k].flatten()
+            elmean = elraw[N.isfinite(elraw)].mean()
+            tiraw  = ti[0,k].flatten()
+            timean = tiraw[N.isfinite(tiraw)].mean()
+
+            print "Processing SWP: %d  EL:  %f  TIME:  %s " % (k, elmean, sec_utime.num2date(timean))
+
+            files.append(plotoban(d[0,p,k], v[0,p,k], x, y, elmean, azmean, \
+                         sec_utime.num2date(timean), pass_no = p+1, directory = options.dir))
         
 # Now create the html file for looking at the data
 
