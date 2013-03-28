@@ -856,14 +856,24 @@ CONTAINS
 
         call check_sweep_size(radd%num_param_desc, swib%num_rays)
 
+        write(6,FMT='(1x,"Field:  ",a8,2x,"Unambiguous Range:   ",f6.1)') vol%sweep%field(n)%name, radd%unambig_range
+        write(6,FMT='(1x,"Field:  ",a8,2x,"Number of Azimuths:  ",i4)') vol%sweep%field(n)%name, swib%num_rays
+
 !       For super-res 88D data, don't use the second reflectivity sweep at a duplicate elevation angle.
-        IF ( (vol%sweep%field(n)%name .eq. 'REF') .and.                     &
-             (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
-          write(6,*) 'DELETING REFLECTIVITY DATA at duplicate elevation angle:  ', swib%fixed_ang
-          DO r=1, swib%num_rays
-            rdat(r)%data(:) = sbad
-          ENDDO
+
+        IF ( (vol%sweep%field(n)%name .eq. 'REF') .and. & (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
+          write(6,FMT='(1x,a)') 'NOTE:  OBAN is assuming you want to use superres and that all variables are stored in SWP file!!!!'
+          write(6,FMT='(1x,a)') 'NOTE:  OBAN is assuming you want to use superres and that all variables are stored in SWP file!!!!'
+          write(6,FMT='(1x,a)') 'NOTE:  See lines 865-871 in oban.f90 to change this!!!'
+          write(6,FMT='(1x,a)') 'NOTE:  See lines 865-871 in oban.f90 to change this!!!'
         ENDIF
+
+!       IF ( (vol%sweep%field(n)%name .eq. 'REF') .and. & (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
+!         write(6,*) 'DELETING REFLECTIVITY DATA at duplicate elevation angle:  ', swib%fixed_ang
+!         DO r=1, swib%num_rays
+!           rdat(r)%data(:) = sbad
+!         ENDDO
+!       ENDIF
 
 ! DCD 12/8/10
         IF (rlat .eq. r_missing) vol%rlat = radd%radar_lat
