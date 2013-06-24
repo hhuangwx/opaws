@@ -1355,10 +1355,11 @@ END SUBROUTINE WRITENETCDF
 !     Creation Date:  August 2005
 !
 !     Modifications:  Feb 2010, L Wicker, accomodate new data structure
+!     June 2013, D Dowell, output multiple times for sweep-by-sweep analyses
 !
 !############################################################################
 
-  SUBROUTINE WRITEV5D(prefix, anal, cyr, cmo, cda, chr, cmn, cse)
+  SUBROUTINE WRITEV5D(prefix, anal, numtimes, year, month, day, hour, minute, second)
 
     USE DTYPES_module
 
@@ -1367,16 +1368,17 @@ END SUBROUTINE WRITENETCDF
     include 'v5df.h'
     include 'opaws.inc'
 
-! Input parameters
+! Input parameters and data
 
     character(len=*) prefix      ! output file
-
-! Analysis grid and radar data are stored in these two derived types
-
-    TYPE(ANALYSISGRID) :: anal
- 
-    integer(kind=2) cyr,cmo,cda  ! central date
-    integer(kind=2) chr,cmn,cse  ! central time
+    TYPE(ANALYSISGRID) :: anal   ! analysis grid and radar data in derived type
+    integer numtimes
+    integer(kind=2) :: year(numtimes)
+    integer(kind=2) :: month(numtimes)
+    integer(kind=2) :: day(numtimes)
+    integer(kind=2) :: hour(numtimes)
+    integer(kind=2) :: minute(numtimes)
+    integer(kind=2) :: second(numtimes)
 
 ! Local variables
 
@@ -1393,7 +1395,6 @@ END SUBROUTINE WRITENETCDF
     real(kind=4), allocatable :: G(:,:,:)
 
     integer nr, nc, nl
-    integer numtimes
     integer numvars
     character(len=10) varname(MAXVARS)
     integer dates(MAXTIMES)
@@ -1411,7 +1412,7 @@ END SUBROUTINE WRITENETCDF
 ! Vis5d variables initialized to missing values
 
     data nr,nc,nl / IMISSING, IMISSING, IMISSING /
-    data numtimes,numvars / IMISSING, IMISSING /
+    data numvars / IMISSING /
     data (varname(i),i=1,MAXVARS) / MAXVARS*"          " /
     data (dates(i),i=1,MAXTIMES) / MAXTIMES*IMISSING /
     data (times(i),i=1,MAXTIMES) / MAXTIMES*IMISSING /
@@ -1439,8 +1440,11 @@ END SUBROUTINE WRITENETCDF
 
     nr = ny
     nc = nx
-    nl = nz
-    numtimes = 1
+    if (numtimes.gt.1) then
+      nl = 1                       ! sweep-by-sweep data
+    else
+      nl = nz
+    endif
     numvars = nfld
 
     allocate(G(ny,nx,nz))
@@ -1449,8 +1453,6 @@ END SUBROUTINE WRITENETCDF
       varname(s) = anal%name(s)
     ENDDO
 
-    dates(1) = 0
-    times(1) = 0
     northlat = anal%ymin + (ny-1)*anal%dy
     northlat = anal%glat + (ny-1)*anal%dy*(1./111.) + anal%ymin*(1./111.)
     latinc   = anal%dy
@@ -1475,16 +1477,18 @@ END SUBROUTINE WRITENETCDF
     bottomhgt = anal%zmin
     hgtinc    = anal%dz
 
-! Compute Julian day for vis5d.
+! Compute YYDDD for vis5d.
 
-    dates(1) = 2004000
-    IF (cmo.gt.1) THEN
-      DO i = 1, cmo-1
-        dates(1) = dates(1) + ndays(i)
-      ENDDO
-    ENDIF
-    dates(1) = dates(1) + cda
-    times(1) = chr*10000 + cmn*100 + cse
+    DO it = 1,numtimes
+      dates(it) = mod(year(it),100) * 1000
+      IF (month(it).gt.1) THEN
+        DO i = 1, month(it)-1
+          dates(it) = dates(it) + ndays(i)
+        ENDDO
+      ENDIF
+      dates(it) = dates(it) + day(it)
+      times(it) = hour(it)*10000 + minute(it)*100 + second(it)
+    ENDDO
 
 ! Create the v5d file.
 
@@ -1509,7 +1513,11 @@ END SUBROUTINE WRITENETCDF
           DO j = 1,nr
             DO i = 1,nc
 
-               G(nr-j+1,i,k) = anal%f(i,j,k,iv,npass)
+               if (numtimes.gt.1) then
+                 G(nr-j+1,i,k) = anal%f(i,j,it,iv,npass)    ! sweep-by-sweep data
+               else
+                 G(nr-j+1,i,k) = anal%f(i,j,k,iv,npass)
+               endif
 
                IF (G(nr-j+1,i,k) .eq. sbad) G(nr-j+1,i,k) = 9.9E30
 
