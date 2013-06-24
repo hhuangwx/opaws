@@ -93,7 +93,7 @@ PROGRAM OBAN
   include 'v5df.h'
   include 'structures.inc'
 
-  character(LEN=128), parameter :: version = "Version 2.1:  Updated 24 February 2012 [DCD]"
+  character(LEN=128), parameter :: version = "Version 2.1.1:  Updated 24 June 2013 [DCD]"
 
   integer i, j, k, ns, np, nf                 ! loop variables
   integer ls                                  ! length of input string
@@ -1384,6 +1384,13 @@ CONTAINS
           write(6,*) 'Minute of sweep = ', fdata%minute
           write(6,*) 'Second of sweep = ', fdata%second
           write(6,*)
+
+          sweep_info%year(s) = fdata%year
+          sweep_info%month(s) = fdata%month
+          sweep_info%day(s) = fdata%day
+          sweep_info%hour(s) = fdata%hour
+          sweep_info%minute(s) = fdata%minute
+          sweep_info%second(s) = fdata%second
 
           IF (s.eq.1) THEN
             IF (cyr .eq. i_missing) THEN
