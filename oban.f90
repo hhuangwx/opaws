@@ -267,6 +267,12 @@ PROGRAM OBAN
   write(6,*)
 
   allocate(sweep_info%Nyquist_vel(nfld,nswp))
+  allocate(sweep_info%year(nswp))
+  allocate(sweep_info%month(nswp))
+  allocate(sweep_info%day(nswp))
+  allocate(sweep_info%hour(nswp))
+  allocate(sweep_info%minute(nswp))
+  allocate(sweep_info%second(nswp))
   sweep_info%Nyquist_vel(:,:) = 0.0
 
 ! If this is a 2D analysis (on a sweep surface), set the vertical levels to number of sweeps
@@ -725,7 +731,12 @@ PROGRAM OBAN
     IF( nswp > MAXLEVELS) THEN
       write(6,*) 'Cannot create vis5d file, too many levels'
     ELSE
-      CALL WRITEV5D(output_prefix, anal, cyr, cmo, cda, chr, cmn, cse)
+      IF (analysis_type .eq. 2) THEN
+        CALL WRITEV5D(output_prefix, anal, nswp, sweep_info%year, sweep_info%month, sweep_info%day,   &
+                                                 sweep_info%hour, sweep_info%minute, sweep_info%second)
+      ELSE
+        CALL WRITEV5D(output_prefix, anal, 1, cyr, cmo, cda, chr, cmn, cse)
+      ENDIF
     ENDIF
   ENDIF
 
@@ -742,6 +753,12 @@ PROGRAM OBAN
   deallocate(anal%count)
   deallocate(anal%name)
   deallocate(sweep_info%Nyquist_vel)
+  deallocate(sweep_info%year)
+  deallocate(sweep_info%month)
+  deallocate(sweep_info%day)
+  deallocate(sweep_info%hour)
+  deallocate(sweep_info%minute)
+  deallocate(sweep_info%second)
   IF (cm_use_clutter_mask) THEN
     deallocate(cm_clutter)
     deallocate(cm_r)
@@ -861,7 +878,7 @@ CONTAINS
 
 !       For super-res 88D data, don't use the second reflectivity sweep at a duplicate elevation angle.
 
-        IF ( (vol%sweep%field(n)%name .eq. 'REF') .and. & (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
+        IF ( (vol%sweep%field(n)%name .eq. 'REF') .and. (radd%unambig_range .lt. 300.0) .and. (swib%num_rays .eq. 720) ) THEN
           write(6,FMT='(1x,a)') 'NOTE:  OBAN is assuming you want to use superres and that all variables are stored in SWP file!!!!'
           write(6,FMT='(1x,a)') 'NOTE:  OBAN is assuming you want to use superres and that all variables are stored in SWP file!!!!'
           write(6,FMT='(1x,a)') 'NOTE:  See lines 865-871 in oban.f90 to change this!!!'
@@ -1047,10 +1064,16 @@ CONTAINS
 
           CALL SET_DATE_GREGORIAN_JD(vol%day, vol%sec, int(vold%year), int(ryib(1)%julian_day), &
                                      int(ryib(1)%hour), int(ryib(1)%min), int(ryib(1)%sec))
+          CALL GET_DATE_GREGORIAN(vol%day, vol%sec, year, month, day, hour, minute, second)
+          sweep_info%year(s) = year
+          sweep_info%month(s) = month
+          sweep_info%day(s) = day
+          sweep_info%hour(s) = hour
+          sweep_info%minute(s) = minute
+          sweep_info%second(s) = second
 
           IF (.not. reference_time_initialized) THEN
             reference_time_initialized = .true.
-            CALL GET_DATE_GREGORIAN(vol%day, vol%sec, year, month, day, hour, minute, second)
             IF (cyr .eq. i_missing) THEN
               cyr = year
               write(6,*) "READSWEEP:  setting reference year (cyr) to ", cyr
