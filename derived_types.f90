@@ -59,6 +59,12 @@ MODULE DTYPES_module
 ! DCD 11/26/10
   TYPE SWEEP_INFORMATION
     real, allocatable :: Nyquist_vel(:,:)        ! Nyquist velocity (field number, sweep number) in m/s
+    integer(kind=2), allocatable :: year(:)
+    integer(kind=2), allocatable :: month(:)
+    integer(kind=2), allocatable :: day(:)
+    integer(kind=2), allocatable :: hour(:)
+    integer(kind=2), allocatable :: minute(:)
+    integer(kind=2), allocatable :: second(:)
   END TYPE SWEEP_INFORMATION
 
   TYPE SWEEPS
