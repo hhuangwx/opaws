@@ -2008,3 +2008,147 @@ END SUBROUTINE WRITENETCDF
       return
       end
 
+
+!############################################################################
+!
+!     ##################################################################
+!     ##################################################################
+!     ######                                                      ######
+!     ######              SUBROUTINE READ_MOSAIC_3D               ######
+!     ######                                                      ######
+!     ##################################################################
+!     ##################################################################
+!
+!
+!############################################################################
+!
+!     PURPOSE:
+!
+!     This subroutine reads data from a netcdf NMQ 3D reflectivity mosaic file.
+!
+!     Reference:  "The NSSL National 3-D Refectivity Mosaic Data Specifications
+!                  and Product Suite", 16 March 2011
+!
+!     Author:  David Dowell
+!
+!     Creation Date:  May 2012
+!
+!############################################################################
+
+      subroutine READ_MOSAIC_3D(ncfile, nx, ny, nz, mrefl, height, lat, lon)
+
+      USE netcdf
+
+      implicit none
+
+      include 'opaws.inc'
+
+!---- input parameters
+
+      character(len=*) ncfile                                ! input netcdf file name
+
+!---- returned variables
+      integer nx                                             ! number of gridpoints in longitude direction
+      integer ny                                             ! number of gridpoints in latitude direction
+      integer nz                                             ! number of gridpoints in vertical direction
+      real mrefl(mosaic_dim_x, mosaic_dim_y, mosaic_dim_z)   ! reflectivity (dBZ)
+      real height(mosaic_dim_x, mosaic_dim_y, mosaic_dim_z)  ! height (m MSL)
+      real lat(mosaic_dim_x, mosaic_dim_y, mosaic_dim_z)     ! latitude (deg N)
+      real lon(mosaic_dim_x, mosaic_dim_y, mosaic_dim_z)     ! longitude (deg E)
+
+!---- Interface block for SUBROUTINE CHECK
+
+      INTERFACE
+        SUBROUTINE CHECK(status, message)
+          integer, intent (in) :: status
+          character(len=*), optional :: message
+        END SUBROUTINE CHECK
+      END INTERFACE
+      
+!---- local variables
+
+      integer ncid                    ! netCDF file ID
+      integer id                      ! dimension / variable id
+      integer i, j, k
+      integer(kind=2), allocatable :: refl_short(:,:,:)
+      real, allocatable            :: height_1d(:)
+      real refl_scale
+      real missing_data_flag
+      real lat_nw, lon_nw
+      real delta_lat, delta_lon
+
+
+
+
+      write(6,*)
+      write(6,*) "READ_MOSAIC_3D -> INPUT FILE:"
+      write(6,*) ncfile
+
+      call check(nf90_open(ncfile, nf90_nowrite, ncid))
+
+      call check(nf90_inq_dimid(ncid, 'Ht', id));
+      call check(nf90_inquire_dimension(ncid, id, len = nz));
+
+      call check(nf90_inq_dimid(ncid, 'Lat', id));
+      call check(nf90_inquire_dimension(ncid, id, len = ny));
+
+      call check(nf90_inq_dimid(ncid, 'Lon', id));
+      call check(nf90_inquire_dimension(ncid, id, len = nx));
+
+      if (nz .gt. mosaic_dim_z) then
+        write(6,*) 'ERROR IN READ_MOSAIC_3D:  nz, mosaic_dim_z = ', nz, mosaic_dim_z
+        stop
+      endif
+
+      if (ny .gt. mosaic_dim_y) then
+        write(6,*) 'ERROR IN READ_MOSAIC_3D:  ny, mosaic_dim_y = ', ny, mosaic_dim_y
+        stop
+      endif
+
+      if (nx .gt. mosaic_dim_x) then
+        write(6,*) 'ERROR IN READ_MOSAIC_3D:  nx, mosaic_dim_x = ', nx, mosaic_dim_x
+        stop
+      endif
+
+
+      allocate(refl_short(nx, ny, nz))
+      allocate(height_1d(nz))
+
+      call check( nf90_inq_varid(ncid, 'mrefl_mosaic', id) )
+      call check( nf90_get_var(ncid, id, refl_short) )
+      call check( nf90_get_att(ncid, id, 'Scale', refl_scale) )
+
+      call check( nf90_inq_varid(ncid, 'Height', id) )
+      call check( nf90_get_var(ncid, id, height_1d) )
+
+      call check( nf90_get_att(ncid, NF90_GLOBAL, 'MissingData', missing_data_flag) )
+      call check( nf90_get_att(ncid, NF90_GLOBAL, 'Latitude', lat_nw) )
+      call check( nf90_get_att(ncid, NF90_GLOBAL, 'Longitude', lon_nw) )
+      call check( nf90_get_att(ncid, NF90_GLOBAL, 'LatGridSpacing', delta_lat) )
+      call check( nf90_get_att(ncid, NF90_GLOBAL, 'LonGridSpacing', delta_lon) )
+
+      do k=1, nz
+        do j=1, ny
+          do i=1, nx
+
+            height(i,j,k) = height_1d(k)
+
+            mrefl(i,j,k) = refl_short(i,j,k) / refl_scale
+
+            if (mrefl(i,j,k) .eq. missing_data_flag) mrefl(i,j,k) = sbad
+
+            lat(i,j,k) = lat_nw - delta_lat*(j-1)
+            lon(i,j,k) = lon_nw + delta_lon*(i-1)
+
+          enddo
+        enddo
+      enddo
+
+      call check( nf90_close(ncid) )
+
+      deallocate(refl_short)
+      deallocate(height_1d)
+
+      RETURN
+
+      END SUBROUTINE READ_MOSAIC_3D
