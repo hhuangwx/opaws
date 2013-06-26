@@ -37,3 +37,9 @@
       real omega             ! rotation rate of earth (rad/s)
       parameter (omega=0.0000729)
       real, parameter :: max_el_angle_diff = 0.15  ! maximum difference between two elevation angles (deg) that are considered essentially the same
+      integer mosaic_dim_x   ! maximum dimension of NMQ mosaic data tile in longitude direction
+      integer mosaic_dim_y   ! maximum dimension of NMQ mosaic data tile in latitude direction
+      integer mosaic_dim_z   ! maximum dimension of NMQ mosaic data tile in vertical direction
+      parameter (mosaic_dim_x=2001)
+      parameter (mosaic_dim_y=2001)
+      parameter (mosaic_dim_z=31)
