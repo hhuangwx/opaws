@@ -991,4 +991,184 @@ MODULE CS_NAMELIST_MODULE
 END MODULE CS_NAMELIST_MODULE
 
 
+!===========================================================================
+!
+!
+!
+!
+!   /////////////////////             BEGIN             \\\\\\\\\\\\\\\\\\\\
+!   \\\\\\\\\\\\\\\\\\\\\      MD_PARAMETERS MODULE     ////////////////////
+!
+!
+!  Namelist parameters for mosaic_2_dart program.
+!
+!===========================================================================
+MODULE MD_PARAMETERS
+
+  USE DICTIONARY
+
+  implicit none
+
+  character(LEN=100) :: mosaic_directory_name = ""             ! name of directory containing "tile1", "tile2", ..., "tile8" subdirectories
+  character(LEN=30)  :: mosaic_file_name = ""                  ! name of netcdf mosaic radar-data file in each tile subdirectory
+  character(LEN=100) :: dart_output_file_name = "obs_seq.out"  ! name of output DART observation file (text)
+
+  real :: dbz_error_sd = 5.0                     ! standard deviation (dBZ) of reflectivity observation errors
+  integer :: mosaic_horiz_skip = 0               ! horizontal thinning factor for mosaic reflectivity data
+  integer :: mosaic_vert_skip = 0                ! vertical thinning factor for mosaic reflectivity data
+
+
+  NAMELIST /mosaic_2_dart_params/                   &
+                          mosaic_directory_name,    &
+                          mosaic_file_name,         &
+                          dart_output_file_name,    &
+                          dbz_error_sd,             &
+                          mosaic_horiz_skip,        &
+                          mosaic_vert_skip
+
+
+ CONTAINS
+
+   SUBROUTINE MD_PARAMETERS_INIT()
+
+     CALL DICT_CREATE( "directory containing tile subdirectories", str=mosaic_directory_name )
+     CALL DICT_CREATE( "mosaic file (yyyymmdd-hhmmss.netcdf)",     str=mosaic_file_name )
+     CALL DICT_CREATE( "DART output ob file name",                 str=dart_output_file_name )     
+
+     CALL DICT_CREATE( "std dev (dBZ) of ob errors",  flt=dbz_error_sd )
+     CALL DICT_CREATE( "horizontal thinning factor",  int=mosaic_horiz_skip )
+     CALL DICT_CREATE( "vertical thinning factor",    int=mosaic_vert_skip )
+
+   END SUBROUTINE MD_PARAMETERS_INIT
+
+END MODULE MD_PARAMETERS
+!===========================================================================
+!
+!
+!
+!
+!   /////////////////////          BEGIN            \\\\\\\\\\\\\\\\\\\\
+!   \\\\\\\\\\\\\\\\\\\\\    MD_NAMELIST_MODULE     ////////////////////
+!
+!
+!
+!
+!===========================================================================
+MODULE MD_NAMELIST_MODULE
+
+ USE MD_PARAMETERS
+ USE STRING_MODULE
+
+ implicit none
+
+ CONTAINS
+
+  LOGICAL FUNCTION READ_NAMELIST(filename,namelist0)
+
+    character(LEN=*) filename
+    character(LEN=*) namelist0
+    character(LEN=50) namelist
+
+    integer ibeg, iend
+    logical if_exist
+    integer istat
+
+    CALL STRING_LIMITS(filename, ibeg, iend)
+
+    INQUIRE(file=filename(ibeg:iend), exist=if_exist)
+
+    IF( .NOT. if_exist ) THEN
+      write(0,*) 'READ_NAMELIST:  ERROR - INPUT FILE:  ', filename(ibeg:iend), ' DOES NOT EXIST!!!'
+      write(0,*) 'READ_NAMELIST:  ERROR - DOES NOT HAVE A FILE TO READ, EXITING'
+      STOP
+    ENDIF
+
+    open(15,file=filename(ibeg:iend),status='old',form='formatted')
+    rewind(15)
+
+    namelist = UCASE(namelist0)
+    CALL STRING_LIMITS(namelist, ibeg, iend)
+
+    SELECT CASE( namelist(ibeg:iend) )
+
+      CASE( 'MOSAIC_2_DART_PARAMS')
+        read(15,NML=mosaic_2_dart_params,iostat=istat)
+        READ_NAMELIST = .true.
+        IF ( istat .ne. 0 ) THEN
+          write(0,'("Problem reading namelist: ",a, "Error:  ", i10)') namelist, istat
+          READ_NAMELIST = .false.
+        ENDIF
+        CALL MD_PARAMETERS_INIT()
+
+      CASE DEFAULT
+        write(0,*) 'READ_NAMELIST:  ERROR - UNKNOWN NAMELIST REQUESTED:  ', namelist(ibeg:iend)
+        write(0,*) 'READ_NAMELIST:  ERROR - NAMELIST WAS NOT READ!!'
+        READ_NAMELIST = .false.
+
+      END SELECT
+
+    close(15)
+    READ_NAMELIST = .true.
+
+  END FUNCTION READ_NAMELIST
+
+!-------------------------------------------------------------------------------
+
+  SUBROUTINE WRITE_NAMELISTS(iunit)
+
+    USE DICTIONARY
+
+    implicit none
+
+    integer iunit
+
+    write(iunit,'(a)') '! INPUT NAMELIST values for the MOSAIC_2_DART program'
+
+    write(iunit,'(a)')
+
+    CALL DICT_PRINT()
+
+    write(iunit,'(a)')
+
+  END SUBROUTINE WRITE_NAMELISTS
+
+!-------------------------------------------------------------------------------
+
+  SUBROUTINE VERIFY_NAMELISTS(iunit)
+
+    implicit none
+
+    integer iunit
+
+    write(iunit,'(a)')
+
+    write(iunit,'(a)') 'Checking namelists for required information...'
+
+    write(iunit,'(a)')
+
+    IF (mosaic_directory_name .eq. "") CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'mosaic_directory_name')
+    IF (mosaic_file_name .eq. "")      CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'mosaic_file_name')
+    IF (dart_output_file_name .eq. "") CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'dart_output_file_name')
+
+    IF (mosaic_horiz_skip .lt. 0) CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'mosaic_horiz_skip')
+    IF (mosaic_vert_skip .lt. 0)  CALL REPORT_NAMELIST_ERROR_AND_ABORT(iunit, 'mosaic_vert_skip')
+
+  END SUBROUTINE VERIFY_NAMELISTS
+
+!-------------------------------------------------------------------------------
+
+  SUBROUTINE REPORT_NAMELIST_ERROR_AND_ABORT(iunit, parameter_name)
+
+    implicit none
+
+    integer iunit
+    character(LEN=*) parameter_name
+
+    write(iunit,*) 'ERROR -- invalid value of namelist parameter:  ', parameter_name
+    stop
+
+  END SUBROUTINE REPORT_NAMELIST_ERROR_AND_ABORT
+
+END MODULE MD_NAMELIST_MODULE
+
 
