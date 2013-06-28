@@ -2035,7 +2035,7 @@ END SUBROUTINE WRITENETCDF
 !
 !############################################################################
 
-      subroutine READ_MOSAIC_3D(ncfile, nx, ny, nz, mrefl, height, lat, lon)
+      subroutine READ_MOSAIC_3D(ncfile, tiled_mosaic, nx, ny, nz, mrefl, height, lat, lon)
 
       USE netcdf
 
@@ -2046,6 +2046,7 @@ END SUBROUTINE WRITENETCDF
 !---- input parameters
 
       character(len=*) ncfile                                ! input netcdf file name
+      logical tiled_mosaic                                   ! .true. (.false.) if mosaic data are contained in 8 tiles (a single file)
 
 !---- returned variables
       integer nx                                             ! number of gridpoints in longitude direction
@@ -2071,6 +2072,7 @@ END SUBROUTINE WRITENETCDF
       integer id                      ! dimension / variable id
       integer i, j, k
       integer(kind=2), allocatable :: refl_short(:,:,:)
+      real, allocatable            :: refl_real(:,:,:,:)
       real, allocatable            :: height_1d(:)
       real refl_scale
       real missing_data_flag
@@ -2110,15 +2112,26 @@ END SUBROUTINE WRITENETCDF
         stop
       endif
 
-
-      allocate(refl_short(nx, ny, nz))
+      if (tiled_mosaic) then
+        allocate(refl_short(nx, ny, nz))
+      else
+        allocate(refl_real(nx, ny, nz, 1))
+      endif
       allocate(height_1d(nz))
 
       call check( nf90_inq_varid(ncid, 'mrefl_mosaic', id) )
-      call check( nf90_get_var(ncid, id, refl_short) )
-      call check( nf90_get_att(ncid, id, 'Scale', refl_scale) )
+      if (tiled_mosaic) then
+        call check( nf90_get_var(ncid, id, refl_short) )
+        call check( nf90_get_att(ncid, id, 'Scale', refl_scale) )
+      else
+        call check( nf90_get_var(ncid, id, refl_real) )
+      endif
 
-      call check( nf90_inq_varid(ncid, 'Height', id) )
+      if (tiled_mosaic) then
+        call check( nf90_inq_varid(ncid, 'Height', id) )
+      else
+        call check( nf90_inq_varid(ncid, 'Ht', id) )
+      endif
       call check( nf90_get_var(ncid, id, height_1d) )
 
       call check( nf90_get_att(ncid, NF90_GLOBAL, 'MissingData', missing_data_flag) )
@@ -2133,7 +2146,11 @@ END SUBROUTINE WRITENETCDF
 
             height(i,j,k) = height_1d(k)
 
-            mrefl(i,j,k) = refl_short(i,j,k) / refl_scale
+            if (tiled_mosaic) then
+              mrefl(i,j,k) = refl_short(i,j,k) / refl_scale
+            else
+              mrefl(i,j,k) = refl_real(i,j,k,1)
+            endif
 
             if (mrefl(i,j,k) .eq. missing_data_flag) mrefl(i,j,k) = sbad
 
@@ -2146,7 +2163,11 @@ END SUBROUTINE WRITENETCDF
 
       call check( nf90_close(ncid) )
 
-      deallocate(refl_short)
+      if (tiled_mosaic) then
+        deallocate(refl_short)
+      else
+        deallocate(refl_real)
+      endif
       deallocate(height_1d)
 
       RETURN
