@@ -1009,8 +1009,9 @@ MODULE MD_PARAMETERS
 
   implicit none
 
-  character(LEN=100) :: mosaic_directory_name = ""             ! name of directory containing "tile1", "tile2", ..., "tile8" subdirectories
-  character(LEN=30)  :: mosaic_file_name = ""                  ! name of netcdf mosaic radar-data file in each tile subdirectory
+  character(LEN=100) :: mosaic_directory_name = ""             ! name of directory containing "tile1", ..., "tile8" subdirectories (or single file)
+  character(LEN=30)  :: mosaic_file_name = ""                  ! name of netcdf mosaic radar-data file
+  logical :: tiled_mosaic = .true.                             ! .true. (.false.) if mosaic data are contained in 8 tiles (a single file)
   character(LEN=100) :: dart_output_file_name = "obs_seq.out"  ! name of output DART observation file (text)
 
   real :: dbz_error_sd = 5.0                     ! standard deviation (dBZ) of reflectivity observation errors
@@ -1021,6 +1022,7 @@ MODULE MD_PARAMETERS
   NAMELIST /mosaic_2_dart_params/                   &
                           mosaic_directory_name,    &
                           mosaic_file_name,         &
+                          tiled_mosaic,             &
                           dart_output_file_name,    &
                           dbz_error_sd,             &
                           mosaic_horiz_skip,        &
@@ -1031,8 +1033,9 @@ MODULE MD_PARAMETERS
 
    SUBROUTINE MD_PARAMETERS_INIT()
 
-     CALL DICT_CREATE( "directory containing tile subdirectories", str=mosaic_directory_name )
+     CALL DICT_CREATE( "directory containing tile subdirectories (or single mosaic file)", str=mosaic_directory_name )
      CALL DICT_CREATE( "mosaic file (yyyymmdd-hhmmss.netcdf)",     str=mosaic_file_name )
+     CALL DICT_CREATE( "tiled mosaic data",                        log=tiled_mosaic )
      CALL DICT_CREATE( "DART output ob file name",                 str=dart_output_file_name )     
 
      CALL DICT_CREATE( "std dev (dBZ) of ob errors",  flt=dbz_error_sd )
