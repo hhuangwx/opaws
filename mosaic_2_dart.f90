@@ -51,14 +51,15 @@ PROGRAM MOSAIC_2_DART
 
   include 'opaws.inc'
 
-  character(LEN=128), parameter :: version = "Version 1.0:  Updated 22 May 2012 [DCD]"
+  character(LEN=128), parameter :: version = "Version 1.1:  Updated 28 June 2013 [DCD]"
 
-  integer, parameter ::   n_tiles = 8
+  integer n_tiles
   integer tile
+  integer, parameter :: max_tiles = 8
 
-  integer nx(n_tiles)                                             ! number of gridpoints in longitude direction
-  integer ny(n_tiles)                                             ! number of gridpoints in latitude direction
-  integer nz(n_tiles)                                             ! number of gridpoints in vertical direction
+  integer nx(max_tiles)                                             ! number of gridpoints in longitude direction
+  integer ny(max_tiles)                                             ! number of gridpoints in latitude direction
+  integer nz(max_tiles)                                             ! number of gridpoints in vertical direction
   real, allocatable :: mrefl(:,:,:,:)   ! reflectivity (dBZ)
   real, allocatable :: height(:,:,:,:)  ! height (m MSL)
   real, allocatable :: lat(:,:,:,:)     ! latitude (deg N)
@@ -106,6 +107,12 @@ PROGRAM MOSAIC_2_DART
    CALL WRITE_NAMELISTS(6)
    CALL VERIFY_NAMELISTS(6)
   ENDIF
+  
+  if (tiled_mosaic) then
+    n_tiles = 8
+  else
+    n_tiles = 1
+  endif
 
   read(mosaic_file_name(1:4),*) year
   read(mosaic_file_name(5:6),*) month
@@ -120,6 +127,7 @@ PROGRAM MOSAIC_2_DART
 
   write(6,*) 'mosaic_directory_name = ', mosaic_directory_name
   write(6,*) 'mosaic_file_name = ', mosaic_file_name
+  write(6,*) 'tiled_mosaic = ', tiled_mosaic
   write(6,*) 'dart_output_file_name = ', dart_output_file_name
   write(6,*) 'dbz_error_sd = ', dbz_error_sd
   write(6,*) 'mosaic_horiz_skip = ', mosaic_horiz_skip
@@ -145,10 +153,14 @@ PROGRAM MOSAIC_2_DART
   ls1 = index(mosaic_directory_name, ' ') - 1
   ls2 = index(mosaic_file_name, ' ') - 1
   do tile = 1, n_tiles
-    write(mosaic_file, fmt='(A,A,I1,A,A)') mosaic_directory_name(1:ls1), '/tile', tile, '/', mosaic_file_name(1:ls2)
+    if (tiled_mosaic) then
+      write(mosaic_file, fmt='(A,A,I1,A,A)') mosaic_directory_name(1:ls1), '/tile', tile, '/', mosaic_file_name(1:ls2)
+    else
+      write(mosaic_file, fmt='(A,A,A)') mosaic_directory_name(1:ls1), '/', mosaic_file_name(1:ls2)
+    endif
     write(6,*)
     write(6,*) 'reading from ', mosaic_file
-    call READ_MOSAIC_3D(mosaic_file, nx(tile), ny(tile), nz(tile), &
+    call READ_MOSAIC_3D(mosaic_file, tiled_mosaic, nx(tile), ny(tile), nz(tile), &
                         mrefl(1,1,1,tile), height(1,1,1,tile), lat(1,1,1,tile), lon(1,1,1,tile))
     write(6,*) 'nx, ny, nz = ', nx(tile), ny(tile), nz(tile)
   enddo
